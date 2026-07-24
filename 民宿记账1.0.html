@@ -1,0 +1,1781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>民宿订单收据</title>
+
+<!-- 小票样式（导出时读取此块） -->
+<style id="rcss">
+  :root{
+    --paper:#fbfaf6; --page:#ece8df; --ink:#2c2a27; --ink-2:#6b675e;
+    --muted:#a8a294; --line:#e4dfd4; --accent:#9a8c6d; --radius:14px;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  .receipt{
+    position:relative; width:100%; max-width:384px;
+    background:var(--paper);
+    border-radius:var(--radius) var(--radius) 0 0;
+    padding:34px 30px 26px;
+    box-shadow:0 1px 0 rgba(255,255,255,.6) inset,
+               0 18px 40px -24px rgba(60,54,42,.45),
+               0 2px 8px -4px rgba(60,54,42,.18);
+    background-image:radial-gradient(rgba(120,108,86,.035) 1px, transparent 1.4px);
+    background-size:7px 7px, 100% 100%;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:1px solid var(--line); }
+  .mark{ width:38px; height:38px; border:1px solid var(--ink-2); border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:17px; color:var(--ink); flex:0 0 auto; overflow:hidden; }
+  .mark img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .brand-text{ flex:1 1 auto; }
+  .brand-name{ font-size:16px; letter-spacing:.16em; font-weight:600; }
+  .brand-sub{ margin-top:3px; font-size:10px; letter-spacing:.28em; color:var(--muted); }
+  .paid{ flex:0 0 auto; font-size:10px; letter-spacing:.18em; color:var(--accent);
+    border:1px solid var(--accent); border-radius:999px; padding:4px 9px; white-space:nowrap; cursor:pointer; }
+  .paid.off{ color:var(--muted); border-color:var(--muted); }
+  .chan{ flex:0 0 auto; font-size:10px; letter-spacing:.12em; border:1px solid currentColor;
+    border-radius:999px; padding:4px 9px; white-space:nowrap; font-weight:600; }
+  .chan[data-act]{ cursor:pointer; }
+  .meta{ display:flex; gap:18px; padding:10px 0 12px; font-size:12px; color:var(--ink-2); }
+  .meta .label{ font-size:10px; letter-spacing:.14em; color:var(--muted); margin-bottom:4px; }
+  .meta .val{ letter-spacing:.02em; }
+  /* 入住信息条 */
+  .stay{ display:flex; align-items:stretch; gap:14px; padding:12px 0 2px; }
+  .stay .col{ flex:1 1 0; }
+  .stay .col.mid{ flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--muted); }
+  .stay .k{ font-size:10px; letter-spacing:.14em; color:var(--muted); margin-bottom:4px; }
+  .stay .d{ font-size:15px; color:var(--ink); letter-spacing:.01em; font-weight:600; }
+  .stay .w{ font-size:10px; color:var(--muted); margin-top:2px; }
+  .stay .nights{ font-size:11px; color:var(--accent); border:1px solid var(--line); border-radius:999px; padding:2px 8px; white-space:nowrap; }
+  .stay .arrow{ font-size:14px; line-height:1; margin-bottom:6px; }
+  .section-title{ font-size:10px; letter-spacing:.24em; color:var(--muted); margin-bottom:8px; }
+  .items{ padding-bottom:6px; }
+  .item{ padding:9px 0; border-bottom:1px dashed var(--line); position:relative; }
+  .item:first-child{ padding-top:0; }
+  .item-row{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  .item-name{ font-size:13.5px; color:var(--ink); line-height:1.4; }
+  .item-amt{ font-size:13.5px; color:var(--ink); white-space:nowrap; display:inline-flex; align-items:center; gap:5px; }
+  .item-spec{ margin-top:5px; font-size:11px; color:var(--muted); letter-spacing:.02em; }
+  .item-spec .x{ color:var(--ink-2); padding:0 6px; }
+  .totals{ margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+  .t-row{ display:flex; justify-content:space-between; align-items:baseline;
+    font-size:12.5px; color:var(--ink-2); padding:5px 0; }
+  .t-row .v{ color:var(--ink); letter-spacing:.02em; }
+  .t-row .minus{ color:var(--accent); }
+  .t-row.final{ margin-top:10px; padding-top:14px; border-top:1px solid var(--line); }
+  .t-row.final .k{ font-size:12px; letter-spacing:.14em; color:var(--ink); }
+  .t-row.final .v{ font-size:22px; font-weight:600; color:var(--ink); }
+  .guestpay{ margin-top:12px; font-size:11px; color:var(--ink-2); letter-spacing:.02em; line-height:1.6; }
+  .guestpay .k{ color:var(--muted); font-size:10px; letter-spacing:.14em; }
+  .note-box{ margin-top:14px; padding:10px 12px; background:rgba(154,140,109,.06); border:1px solid var(--line); border-radius:10px;
+    font-size:11.5px; color:var(--ink-2); line-height:1.7; }
+  .note-box .k{ color:var(--muted); font-size:10px; letter-spacing:.14em; display:block; margin-bottom:4px; }
+  .tear{ position:relative; margin:16px -30px 0; height:1px; border-top:1px dashed var(--muted); }
+  .tear .txt{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    background:var(--paper); padding:0 12px; font-size:10px; letter-spacing:.3em; color:var(--muted); }
+  .tear::before,.tear::after{ content:""; position:absolute; top:50%; width:16px; height:16px;
+    background:var(--page); border-radius:50%; transform:translateY(-50%);
+    box-shadow:inset 0 0 0 1px rgba(120,108,86,.18); }
+  .tear::before{ left:-38px; } .tear::after{ right:-38px; }
+  .torn{ height:12px; margin:0 -30px;
+    background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='20'%20height='12'%20viewBox='0%200%2020%2012'%3E%3Cpath%20d='M0%200H20L10%2012Z'%20fill='%23fbfaf6'/%3E%3C/svg%3E") repeat-x;
+    background-size:20px 12px; }
+  .foot{ margin-top:14px; text-align:center; font-size:10px; letter-spacing:.18em; color:var(--muted); line-height:1.8; }
+  .roll-gap{ height:18px; }
+  .grand{ margin-top:4px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px 24px; box-shadow:0 18px 40px -24px rgba(60,54,42,.45); }
+  .grand .g-title{ font-size:10px; letter-spacing:.24em; color:var(--muted); margin-bottom:14px; }
+  .grand .g-row{ display:flex; justify-content:space-between; align-items:baseline;
+    font-size:12.5px; color:var(--ink-2); padding:7px 0; }
+  .grand .g-row .v{ color:var(--ink); letter-spacing:.02em; }
+  .grand .g-row .v.minus{ color:var(--accent); }
+  .grand .g-row.final{ margin-top:10px; padding-top:14px; border-top:1px solid var(--line); }
+  .grand .g-row.final .k{ font-size:12px; letter-spacing:.14em; color:var(--ink); }
+  .grand .g-row.final .v{ font-size:22px; font-weight:600; color:var(--ink); }
+  .grand .g-sub{ font-size:10px; letter-spacing:.24em; color:var(--muted); margin:16px 0 4px; padding-top:14px; border-top:1px dashed var(--line); }
+  .grand .g-row .k .chan-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; vertical-align:middle; }
+
+  /* ===== 云同步面板 ===== */
+  .sync-box{ margin:14px 0 4px; }
+  .sync-box details{ border:1px solid #e4dfd4; border-radius:12px; background:#fbfaf6; overflow:hidden; }
+  .sync-box summary{ cursor:pointer; padding:12px 14px; font-size:12px; letter-spacing:.04em; color:#6b675e; user-select:none; }
+  .sync-form{ padding:6px 14px 16px; display:flex; flex-direction:column; gap:10px; }
+  .sync-form label{ display:flex; flex-direction:column; font-size:11px; color:#a8a294; gap:4px; }
+  .sync-form input[type=text], .sync-form input[type=password]{ font-size:13px; padding:9px 10px; border:1px solid #e4dfd4; border-radius:9px; background:#fff; color:#2c2a27; width:100%; box-sizing:border-box; }
+  .sync-auto{ flex-direction:row !important; align-items:center; gap:8px !important; font-size:12px; color:#6b675e !important; }
+  .sync-auto input{ width:auto; }
+  .sync-btns{ display:flex; flex-wrap:wrap; gap:8px; }
+  .sync-btns .btn{ flex:1 1 auto; min-width:84px; text-align:center; }
+  .sync-status{ font-size:11px; color:#9a8c6d; min-height:14px; }
+  .sync-status.err{ color:#c0392b; }
+  .sync-tip{ font-size:10px; color:#a8a294; line-height:1.6; margin:2px 0 0; }
+  .sync-help{ margin-top:6px; }
+  .sync-steps{ font-size:10px; color:#8a857a; line-height:1.7; padding-left:18px; margin:4px 0; }
+  .sync-steps b{ color:#6b675e; }
+  .sync-sql-wrap{ margin-top:6px; border:1px dashed #e0dac9; border-radius:10px; background:#fff; }
+  .sync-sql-wrap summary{ cursor:pointer; padding:8px 10px; font-size:11px; color:#6b675e; user-select:none; }
+  .sync-sql{ margin:0; padding:10px 12px; font-size:10px; line-height:1.5; white-space:pre-wrap; word-break:break-all; color:#3a3a3a; background:#fbfaf6; border-top:1px dashed #e0dac9; max-height:240px; overflow:auto; }
+  .copy-sql{ margin:8px 10px 10px; font-size:11px; padding:6px 12px; }
+</style>
+
+<!-- 页面 / 编辑态样式 -->
+<style id="ecss">
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+    background:radial-gradient(120% 80% at 50% -10%, #f3efe7 0%, #ece8df 60%, #e4dfd4 100%);
+    color:#2c2a27; -webkit-font-smoothing:antialiased;
+    font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;
+    padding:26px 16px 56px;
+  }
+  .wrap{ width:100%; max-width:520px; margin:0 auto; }
+  .hint{ font-size:11px; letter-spacing:.04em; color:#a8a294; text-align:center; margin:16px 0 0; position:relative; }
+  .hint .ver{ position:absolute; right:0; top:0; font-size:9px; color:#c7c2b6; background:#f5f3ed; padding:1px 6px; border-radius:4px; }
+
+  .topbar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  .picker{ display:flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.16em; color:#a8a294; }
+  .picker select{
+    font:inherit; font-size:12.5px; letter-spacing:.04em; color:#2c2a27;
+    background:#fbfaf6; border:1px solid #e4dfd4; border-radius:999px; padding:8px 32px 8px 14px;
+    cursor:pointer; appearance:none; -webkit-appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,#6b675e 50%),linear-gradient(135deg,#6b675e 50%,transparent 50%);
+    background-position:calc(100% - 16px) 52%, calc(100% - 11px) 52%;
+    background-size:5px 5px,5px 5px; background-repeat:no-repeat;
+  }
+  .picker select:focus{ outline:none; border-color:#9a8c6d; }
+  .count{ white-space:nowrap; }
+  .summary{ display:flex; flex-wrap:wrap; gap:12px 22px; justify-content:center;
+    font-size:11px; letter-spacing:.06em; color:#6b675e; margin:0 0 18px; padding:12px 16px;
+    background:#fbfaf6; border:1px solid #e4dfd4; border-radius:12px; }
+  .summary b{ color:#2c2a27; font-weight:600; font-size:13px; padding-left:4px; }
+  .ocr-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center; margin:0 0 16px; font-size:11px; color:#9a8c6d; }
+  .ocr-status{ letter-spacing:.04em; font-weight:600; }
+  .ocr-status.err{ color:#c0392b; }
+  .ocr-raw{ font-size:11px; }
+  .ocr-raw summary{ cursor:pointer; color:#6b675e; }
+  .ocr-raw pre{ white-space:pre-wrap; word-break:break-all; max-height:160px; overflow:auto; background:#fbfaf6; border:1px solid #e4dfd4; border-radius:8px; padding:10px 12px; margin-top:6px; color:#6b675e; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; line-height:1.6; }
+  .stat-panel{ margin:0 0 16px; background:#fbfaf6; border:1px solid #e4dfd4; border-radius:12px; padding:14px 16px; }
+  .stat-empty{ font-size:12px; color:#c0392b; }
+  .empty-state{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; min-height:360px; padding:40px 24px; color:#9a9488; }
+  .empty-state .empty-ico{ font-size:54px; line-height:1; margin-bottom:14px; opacity:.85; }
+  .empty-state .empty-title{ font-size:17px; font-weight:600; color:#6b675e; margin-bottom:8px; }
+  .empty-state .empty-sub{ font-size:12.5px; line-height:1.7; max-width:340px; color:#9a9488; }
+  .stat-head{ font-size:12px; color:#6b675e; letter-spacing:.04em; margin-bottom:10px; }
+  .stat-head b{ color:#2c2a27; font-size:14px; }
+  .stat-list{ display:grid; gap:6px; }
+  .stat-item{ display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; color:#2c2a27; padding:5px 0; border-bottom:1px dashed #e4dfd4; }
+  .stat-item:last-child{ border-bottom:none; }
+  .stat-item.muted{ color:#a8a294; }
+  .stat-item .amt{ font-weight:600; letter-spacing:.02em; }
+  .stat-copy{ margin-top:12px; }
+  .topbar-btns{ display:flex; flex-wrap:wrap; gap:7px; }
+  .grand-host{ margin-top:18px; }
+  .actionbar{ display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 16px; }
+  .actionbar .btn{ flex:1 1 auto; min-width:76px; text-align:center; }
+  .exp-status{ font-size:11px; color:#9a8c6d; line-height:1.5; margin:-8px 0 10px; min-height:14px; }
+  .exp-status.err{ color:#c0392b; }
+  .btn{ appearance:none; border:1px solid #6b675e; background:transparent; color:#2c2a27;
+    font:inherit; font-size:11px; letter-spacing:.1em; padding:8px 12px; border-radius:999px; cursor:pointer;
+    transition:background .18s ease,color .18s ease,transform .12s ease; }
+  .btn:hover{ background:#2c2a27; color:#fbfaf6; }
+  .btn:active{ transform:scale(.97); }
+
+  /* 可编辑文字 */
+  [contenteditable]{ outline:none; border-radius:4px; transition:background .15s, box-shadow .15s; -webkit-user-select:text; user-select:text; }
+  [contenteditable]:hover{ background:rgba(154,140,109,.10); cursor:text; }
+  [contenteditable]:focus{ background:rgba(154,140,109,.16); box-shadow:0 0 0 1px rgba(154,140,109,.45); }
+  .ed{ display:inline; }
+
+  /* 行内删除 / 添加按钮 */
+  .row-del{ border:none; background:#f0ece3; color:#9a8c6d; width:20px; height:20px; border-radius:50%;
+    font-size:13px; line-height:1; cursor:pointer; margin-left:6px; vertical-align:middle;
+    transition:background .15s,color .15s; flex:0 0 auto; }
+  .row-del:hover{ background:#e2dccd; color:#2c2a27; }
+  .item-spec .row-del{ margin-left:8px; }
+  .amt-reset{ width:16px; height:16px; font-size:11px; border-radius:50%; border:none; background:#f0ece3; color:#9a8c6d; cursor:pointer; line-height:1; flex:0 0 auto; }
+  .amt-reset:hover{ background:#e2dccd; color:#2c2a27; }
+  .disc-row{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:var(--ink-2); padding:6px 0; }
+  .disc-row .ed.k{ flex:1 1 auto; margin-right:10px; }
+  .disc-amt{ display:inline-flex; align-items:baseline; gap:1px; color:var(--accent); white-space:nowrap; }
+  .add-btn{ width:100%; border:1px dashed #c9c2b2; background:transparent; color:#9a8c6d;
+    font:inherit; font-size:12px; letter-spacing:.08em; padding:8px; border-radius:8px; cursor:pointer; margin-top:8px; }
+  .add-btn:hover{ background:#f3efe7; }
+  .hint-sm{ font-size:11px; color:#a8a294; margin:6px 0 2px; letter-spacing:.04em; }
+  .hint-sm b{ color:#6b675e; font-weight:600; }
+
+  @media (max-width:430px){
+    .receipt{ padding:30px 22px 22px; }
+    .tear{ margin-left:-22px; margin-right:-22px; }
+    .torn{ margin-left:-22px; margin-right:-22px; }
+  }
+  @media print{
+    body{ background:#fff; padding:0; }
+    .topbar, .hint, .row-del, .add-btn, .amt-reset, .hint-sm, .summary, .ocr-bar, .actionbar{ display:none !important; }
+    .wrap{ max-width:100%; }
+    [contenteditable]{ background:transparent !important; box-shadow:none !important; }
+    .receipt{ box-shadow:none; max-width:100%; }
+    .grand{ box-shadow:none; }
+    .roll{ display:block; overflow:visible; padding:0; margin:0; }
+    .rcard{ width:100%; max-width:100%; margin:0 0 18px; position:relative; }
+  }
+  .stat-actions{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .sum-block{ margin-top:14px; border-top:1px dashed #e4dfd4; padding-top:14px; }
+  .sum-title{ font-size:13px; font-weight:600; letter-spacing:.12em; color:#2c2a27; margin-bottom:10px; }
+  .sum-sub{ font-size:12px; font-weight:600; letter-spacing:.08em; color:#6b675e; margin:14px 0 8px; }
+  .sum-table{ width:100%; border-collapse:collapse; font-size:12px; }
+  .sum-table th, .sum-table td{ padding:7px 8px; text-align:left; border-bottom:1px dashed #e4dfd4; }
+  .sum-table th{ font-size:10px; letter-spacing:.12em; color:#a8a294; font-weight:600; }
+  .sum-table td{ color:#2c2a27; }
+  .sum-table .amt{ font-weight:600; letter-spacing:.02em; }
+  .sum-total td{ padding-top:10px; font-size:12.5px; font-weight:600; color:#2c2a27; border-top:1px solid #e4dfd4; border-bottom:none; }
+  .vis-hide{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .flash{ animation: rcflash 1.1s ease; }
+  @keyframes rcflash{ 0%{ box-shadow:0 0 0 4px #ffcf3a; } 100%{ box-shadow:0 0 0 0 rgba(255,207,58,0); } }
+
+  /* 全部订单：小票上下排列，页面可竖向滚动；左右滑某张小票即可删除（类似 iOS 邮件列表） */
+  .roll{ display:flex; flex-direction:column; align-items:stretch; gap:16px; overflow:visible;
+    padding:4px 0; margin:0; touch-action:pan-y; }
+  .rcard{ width:100%; max-width:100%; margin:0; position:relative;
+    user-select:none; touch-action:pan-y; transition: transform .26s cubic-bezier(.2,.8,.2,1), opacity .26s ease; will-change:transform; }
+  .roll .rcard:first-child{ margin-top:0; }
+  .roll .rcard .receipt{ box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 18px 40px -22px rgba(60,54,42,.5), 0 2px 8px -4px rgba(60,54,42,.22); }
+  /* 左右滑删除（类似 iOS）：从非编辑区向左滑超过阈值即飞出删除 */
+  .rcard.fly{ transform: translateX(-120%); opacity:0; }
+  .rcard.fly-hint::after{ content:"← 松手删除"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    background:rgba(192,57,43,.94); color:#fff; padding:9px 16px; border-radius:999px; font-size:13px; letter-spacing:.06em;
+    z-index:50; pointer-events:none; box-shadow:0 6px 16px -6px rgba(0,0,0,.4); }
+  .rcard.fly-hint{ box-shadow:0 0 0 2px rgba(192,57,43,.45), 0 18px 40px -22px rgba(60,54,42,.5); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="picker">
+      <span>订单</span>
+      <select id="orderSelect" onchange="selectOrder(this.value)"></select>
+      <span class="count" id="orderCount"></span>
+    </div>
+    <div class="picker">
+      <span>渠道</span>
+      <select id="channelFilter" onchange="setChannelFilter(this.value)"></select>
+    </div>
+    <div class="topbar-btns">
+      <button class="btn" data-top="ocr">上传截图识别</button>
+    </div>
+  </div>
+
+  <input type="file" id="ocrFile" accept="image/*" multiple class="vis-hide">
+  <div class="ocr-bar">
+    <span class="ocr-status" id="ocrStatus"></span>
+    <details class="ocr-raw"><summary>查看识别原文</summary><pre id="ocrText"></pre></details>
+  </div>
+
+  <div class="stat-panel" id="statPanel" hidden></div>
+
+  <div class="grand-host" id="grandHost"></div>
+
+  <div class="actionbar" id="actionbar">
+    <button class="btn" data-top="new">新建</button>
+    <button class="btn" data-top="dup">复制</button>
+    <button class="btn" data-top="del">删除</button>
+    <button class="btn" data-top="reset">清空</button>
+    <button class="btn" data-top="export">下载 HTML</button>
+    <button class="btn" data-top="print">打印</button>
+    <button class="btn" data-top="tdoc">导出到腾讯文档</button>
+  </div>
+  <div class="exp-status" id="expStatus"></div>
+
+  <div id="stage"></div>
+
+  <div class="sync-box">
+    <details id="vikaDetails">
+      <summary>🟢 维格表自动同步（国内云表格）</summary>
+      <div class="sync-form">
+        <label>表格ID<input id="vikaDs" type="text" placeholder="如 dstWUHwzTHd2YQaXEE" autocomplete="off"></label>
+        <label>API Token<input id="vikaToken" type="password" placeholder="usk... 维格表「头像→开发者→API Token」获取" autocomplete="off"></label>
+        <label class="sync-auto"><input id="vikaAuto" type="checkbox"> 自动同步（每次改动覆盖同步到云端表格）</label>
+        <div class="sync-btns">
+          <button class="btn vika-save">保存配置</button>
+          <button class="btn vika-init">初始化表格</button>
+          <button class="btn vika-push">上传全部</button>
+        </div>
+        <div class="sync-status" id="vikaStatus"></div>
+        <div class="sync-help">
+          <p class="sync-tip">用法（国内可访问、无需后端）：</p>
+          <ol class="sync-steps">
+            <li>打开 <b>vika.cn</b>（维格表）新建「多维表格」，复制浏览器地址里的 <b>表格ID</b>（dst 开头）。</li>
+            <li>左上角头像 → <b>开发者</b> → <b>API Token</b> → 生成令牌并复制。</li>
+            <li>填上面两项 → <b>保存配置</b> → <b>初始化表格</b>（自动建好 11 列）→ <b>上传全部</b>。之后勾自动同步即可每次改动自动覆盖同步。</li>
+          </ol>
+          <p class="sync-tip">云端表格仅作本地数据的镜像：每次同步用本地当前全部订单<strong>完整覆盖</strong>云端，不重复累积。列：渠道/订单号/入住日期/退房日期/间夜/房费/清洁费/押金/实付金额/客人/电话。</p>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <p class="foot">本收据仅作预订凭证，请妥善保管</p>
+  <p class="hint">直接点小票上的文字即可修改；房费随「间夜 × 每晚」自动计算，改动自动保存本机。<span class="ver" id="verTag">v51</span></p>
+</div>
+
+<script>
+  /* 全局错误兜底：任何报错/未捕获 Promise 都显示到状态条，避免"没反应" */
+  window.addEventListener("error",function(e){
+    var msg=(e&&e.message)||(e&&e.error&&(e.error.message||e.error))||"未知错误";
+    try{ var el=document.getElementById("ocrStatus"); if(el){ el.textContent="页面报错："+msg; el.className="ocr-status err"; } }catch(_){}
+    if(typeof console!=="undefined"&&console.error) console.error("全局错误：",e&&e.error||e);
+  });
+  window.addEventListener("unhandledrejection",function(e){
+    var r=e&&e.reason; var msg=(r&&(r.message||r))||"未知异步错误";
+    try{ var el=document.getElementById("ocrStatus"); if(el){ el.textContent="异步报错："+msg; el.className="ocr-status err"; } }catch(_){}
+    if(typeof console!=="undefined"&&console.error) console.error("未捕获 Promise：",r);
+  });
+  const KEY = "minsu_receipt_orders_v5";
+  const FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif';
+  const AVATAR = "data:image/jpeg;base64,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" ;
+
+  const DEFAULTS = [
+    {
+      store:{ name:"天合民宿", sub:"TIANHE HOMESTAY", mark:"合", avatar:AVATAR }, paid:true, channel:"美团",
+      orderNo:"MS20260720-006218", time:"2026-07-16 21:08",
+      stay:{ checkin:"2026-07-20", checkout:"2026-07-22", checkinWeek:"周一", checkoutWeek:"周三", nights:2 },
+      rooms:[
+        { name:"天合民宿", spec:"可住5人", nights:2, price:399.00 }
+      ],
+      roomTotal:798.00, cleaning:0.00, deposit:200.00,
+      discounts:[],
+      paidAmount:798.00,
+      guest:{ name:"xxxx", phone:"", guests:"" },
+      note:"",
+      payment:{ method:"微信支付", txn:"42000025822026072000621800", time:"2026-07-16 21:09" }
+    },
+    {
+      store:{ name:"天合民宿", sub:"TIANHE HOMESTAY", mark:"合", avatar:AVATAR }, paid:true, channel:"携程",
+      orderNo:"MS20260808-007904", time:"2026-08-01 10:22",
+      stay:{ checkin:"2026-08-08", checkout:"2026-08-11", checkinWeek:"周六", checkoutWeek:"周二", nights:3 },
+      rooms:[
+        { name:"天合民宿", spec:"可住5人", nights:3, price:399.00 }
+      ],
+      roomTotal:1197.00, cleaning:0.00, deposit:300.00,
+      discounts:[],
+      paidAmount:1197.00,
+      guest:{ name:"xxxx", phone:"", guests:"" },
+      note:"",
+      payment:{ method:"支付宝", txn:"202608012200137790400900", time:"2026-08-01 10:23" }
+    }
+  ];
+
+  function load(){
+    try{
+      const s=localStorage.getItem(KEY);
+      if(s){ const a=JSON.parse(s); if(Array.isArray(a)){
+        // 清理早期版本遗留的演示订单（占位 guest 为 xxxx 的固定演示号），保留真实订单
+        const DEMO_NOS=new Set(["MS20260720-006218","MS20260808-007904"]);
+        return a.filter(o=>!(o&&o.orderNo&&DEMO_NOS.has(o.orderNo)));
+      } }
+    }catch(e){}
+    return [];
+  }
+  function save(){ try{ if(orders&&orders.length) orders=dedupOrders(orders); localStorage.setItem(KEY, JSON.stringify(orders)); }catch(e){}
+    scheduleVika(); }
+
+  /* ===== 维格表(Vika) 自动同步：国内云表格，Bearer Token 直连，无需后端 ===== */
+  const VIKA_KEY="muji_vika_cfg";
+  let VIKA=(()=>{ try{ return JSON.parse(localStorage.getItem(VIKA_KEY))||{}; }catch(e){ return {}; } })();
+  let vikaTimer=null;
+  function vikaEnabled(){ return !!(VIKA&&VIKA.dsId&&VIKA.token); }
+  const VIKA_FIELDS=[
+    {name:"入住日期",type:"SingleText"},
+    {name:"退房日期",type:"SingleText"},
+    {name:"间夜",type:"Number",property:{precision:0}},
+    {name:"房费",type:"Number",property:{precision:2}},
+    {name:"清洁费",type:"Number",property:{precision:2}},
+    {name:"实付金额",type:"Number",property:{precision:2}},
+    {name:"订单号",type:"SingleText"},
+    {name:"押金",type:"Number",property:{precision:2}},
+    {name:"客人",type:"SingleText"},
+    {name:"电话",type:"SingleText"}
+  ];
+  const VIKA_API="https://api.vika.cn/fusion/v1";
+  function vikaBase(){ return VIKA_API+"/datasheets/"+VIKA.dsId; }
+  function vikaAuth(){ return { "Authorization":"Bearer "+VIKA.token }; }
+  function vikaJson(){ return { "Authorization":"Bearer "+VIKA.token, "Content-Type":"application/json" }; }
+  function vikaSleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+  // 统一请求封装：自动处理 429 限频重试（免费版 2次/秒）与网络抖动
+  async function vikaCall(method, path, body, withCt){
+    let lastMsg="";
+    for(let attempt=0; attempt<4; attempt++){
+      const headers= withCt ? vikaJson() : vikaAuth();
+      const opts={method, headers};
+      if(body!==undefined) opts.body=JSON.stringify(body);
+      let r;
+      try{ r=await fetch(VIKA_API+path, opts); }
+      catch(e){ await vikaSleep(900); lastMsg="网络错误:"+(e&&e.message||e); continue; }
+      if(r.status===429){ await vikaSleep(1300); lastMsg="限频(429)"; continue; }
+      let j=null; try{ j=await r.json(); }catch(e){}
+      return {ok:r.ok, status:r.status, json:j};
+    }
+    throw new Error("请求失败（多次限频/网络）："+(lastMsg||""));
+  }
+  let vikaSpaceCache=null;
+  async function vikaSpaceId(){
+    if(vikaSpaceCache) return vikaSpaceCache;
+    const {ok,status,json}=await vikaCall("GET","/spaces");
+    if(!ok) throw new Error("获取空间站失败("+status+")");
+    const spaces=((json&&json.data)||{}).spaces||[];
+    if(!spaces.length) throw new Error("该 Token 下没有可访问的空间站");
+    for(const sp of spaces){
+      try{
+        const r2=await vikaCall("GET","/spaces/"+sp.id+"/datasheets?pageSize=200");
+        const list=((r2.json&&r2.json.data)||{}).datasheets||[];
+        if(list.some(d=>d.id===VIKA.dsId)){ vikaSpaceCache=sp.id; return sp.id; }
+      }catch(e){}
+    }
+    vikaSpaceCache=spaces[0].id; return spaces[0].id;
+  }
+  let vikaPrimaryCache=null;
+  async function vikaPrimaryName(){
+    if(vikaPrimaryCache) return vikaPrimaryCache;
+    const {ok,json}=await vikaCall("GET","/datasheets/"+VIKA.dsId+"/fields");
+    if(!ok) return "渠道";
+    const f=((json&&json.data)||{}).fields||[];
+    const p=f.filter(x=>x.isPrimary)[0];
+    vikaPrimaryCache = p? p.name : "渠道";
+    return vikaPrimaryCache;
+  }
+  // 确保 10 列存在（建列接口需 spaceId：POST /spaces/{spaceId}/datasheets/{dstId}/fields）
+  async function vikaEnsureColumns(){
+    const spaceId=await vikaSpaceId();
+    const {ok,status,json}=await vikaCall("GET","/datasheets/"+VIKA.dsId+"/fields");
+    if(!ok) throw new Error("读取列失败("+status+")");
+    const have=((json.data&&json.data.fields)||[]).map(f=>f.name);
+    let created=0;
+    for(const f of VIKA_FIELDS){
+      if(have.indexOf(f.name)>=0) continue;
+      const body={name:f.name, type:f.type, property:(f.type==="Number")?({precision:(f.property&&f.property.precision)||2}):({})};
+      const r=await vikaCall("POST","/spaces/"+spaceId+"/datasheets/"+VIKA.dsId+"/fields", body, true);
+      if(!r.ok) throw new Error("建列「"+f.name+"」失败("+r.status+")"+(r.json&&r.json.message?("："+r.json.message):""));
+      created++;
+    }
+    return created;
+  }
+  function num2(v){ const n=Number(v); return (v==null||isNaN(n))?0:n; }
+  function orderToVikaFields(o){
+    const s=o.stay||{};
+    return {
+      订单号: o.orderNo||"",
+      入住日期: s.checkin||"",
+      退房日期: s.checkout||"",
+      间夜: s.nights!=null?Number(s.nights)||0:0,
+      房费: num2(o.roomTotal),
+      清洁费: num2(o.cleaning),
+      押金: num2(o.deposit),
+      实付金额: num2(o.paidAmount),
+      客人: o.guestName||"",
+      电话: o.guestPhone||""
+    };
+  }
+  // —— 去重 + 按日期排序（维格表同步用）——
+  function pad2(n){ n=String(n); return n.length<2?"0"+n:n; }
+  function parseCnDate(s){
+    if(!s) return "";
+    s=String(s).trim();
+    let m=s.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if(m) return m[1]+"-"+pad2(m[2])+"-"+pad2(m[3]);
+    m=s.match(/(\d{1,2})月(\d{1,2})[日号]?/);
+    if(m) return "2026-"+pad2(m[1])+"-"+pad2(m[2]);
+    return s;
+  }
+  function orderDupKey(o){
+    const s=o.stay||{};
+    const on=(o.orderNo||"").trim();
+    if(on) return "ON:"+on;
+    return "C:"+chanOf(o)+"|"+(s.checkin||"")+"|"+(s.checkout||"")+"|"+(o.guestName||"")+"|"+num2(o.paidAmount)+"|"+num2(o.roomTotal)+"|"+(s.nights!=null?Number(s.nights):"");
+  }
+  function dedupOrders(list){
+    if(!Array.isArray(list)) return list||[];
+    const seen=new Set(), out=[];
+    for(const o of list){
+      const k=orderDupKey(o);
+      if(seen.has(k)) continue;
+      seen.add(k); out.push(o);
+    }
+    return out;
+  }
+  function sortOrdersByDate(list){
+    return (list||[]).slice().sort((a,b)=>{
+      const da=parseCnDate((a.stay&&a.stay.checkin)||"");
+      const db=parseCnDate((b.stay&&b.stay.checkin)||"");
+      return da<db?-1:da>db?1:0;
+    });
+  }
+  function setVikaStatus(msg,err){ const el=document.getElementById("vikaStatus"); if(el){ el.textContent=msg||""; el.className="sync-status"+(err?" err":""); } }
+  async function vikaInitFields(){
+    if(!vikaEnabled()){ setVikaStatus("请先填齐 表格ID 与 API Token 并保存",true); return; }
+    try{
+      const n=await vikaEnsureColumns();
+      setVikaStatus(n? ("已新建 "+n+" 列，表格结构就绪（共 "+VIKA_FIELDS.length+" 列）") : ("表格结构已就绪（共 "+VIKA_FIELDS.length+" 列）"), false);
+    }catch(e){ setVikaStatus("初始化失败："+(e&&e.message||e),true); }
+  }
+  async function vikaReplaceAll(list){
+    let ids=[]; let page=1;
+    while(true){
+      const r=await vikaCall("GET","/datasheets/"+VIKA.dsId+"/records?pageSize=1000&page="+page);
+      if(!r.ok) throw new Error("读取失败("+r.status+")"+(r.json&&r.json.message?("："+r.json.message):""));
+      const recs=((r.json&&r.json.data)||{}).records||[];
+      ids=ids.concat(recs.map(x=>x.recordId).filter(Boolean));
+      if(recs.length<1000) break;
+      page++;
+    }
+    if(ids.length){
+      for(let i=0;i<ids.length;i+=10){
+        const batch=ids.slice(i,i+10);
+        const r=await vikaCall("DELETE","/datasheets/"+VIKA.dsId+"/records?recordIds="+batch.join(","));
+        if(!r.ok) throw new Error("清空失败("+r.status+")"+(r.json&&r.json.message?("："+r.json.message):""));
+        if(r.json&&r.json.success===false) throw new Error("清空失败："+(r.json.message||r.json.code));
+      }
+    }
+    const p=await vikaPrimaryName();
+    const records=list.map(o=>{ const f=orderToVikaFields(o); f[p]=chanOf(o); return {fields:f}; });
+    // 末尾追加「合计」行：房费 / 清洁费 / 实付金额 分别求和（合计写进主列）
+    let sumFang=0,sumQing=0,sumShi=0;
+    for(const o of list){ sumFang+=num2(o.roomTotal); sumQing+=num2(o.cleaning); sumShi+=num2(o.paidAmount); }
+    const r2=Math.round(sumFang*100)/100, q2=Math.round(sumQing*100)/100, s2=Math.round(sumShi*100)/100;
+    records.push({fields:{[p]:"合计", 房费:r2, 清洁费:q2, 实付金额:s2}});
+    for(let i=0;i<records.length;i+=10){
+      const batch=records.slice(i,i+10);
+      const r=await vikaCall("POST","/datasheets/"+VIKA.dsId+"/records",{records:batch},true);
+      if(!r.ok) throw new Error("写入失败("+r.status+")"+(r.json&&r.json.message?("："+r.json.message):""));
+      if(!r.json||!r.json.success) throw new Error("写入错误:"+((r.json&&r.json.message)||("码"+r.status)));
+    }
+    return true;
+  }
+  async function doVikaPush(){
+    if(!vikaEnabled()) return;
+    try{
+      await vikaEnsureColumns();
+      const before=orders.length;
+      const dl=dedupOrders(orders);
+      const removed=before-dl.length;
+      const sorted=sortOrdersByDate(dl);
+      if(removed){ orders=dl; save(); }
+      await vikaReplaceAll(sorted);
+      setVikaStatus("已同步 "+sorted.length+" 笔到维格表"+(removed?("（已去重 "+removed+" 笔）"):"")+" · "+new Date().toLocaleTimeString(),false);
+    }catch(e){ setVikaStatus("同步失败："+(e&&e.message||e),true); }
+  }
+  async function vikaTest(){
+    if(!vikaEnabled()){ setVikaStatus("请先填齐 表格ID 与 API Token 并保存",true); return; }
+    try{
+      const r=await vikaCall("GET","/datasheets/"+VIKA.dsId+"/records?pageSize=1");
+      if(!r.ok) throw new Error("连接失败("+r.status+")"+(r.json&&r.json.message?("："+r.json.message):""));
+      if(r.json&&r.json.success===false) throw new Error(r.json.message||("错误码"+r.json.code));
+      setVikaStatus("连接成功，云端现有 "+((r.json&&r.json.data&&r.json.data.total)||0)+" 行",false);
+    }catch(e){ setVikaStatus("测试失败："+(e&&e.message||e),true); }
+  }
+  function scheduleVika(){
+    if(!vikaEnabled()) return;
+    if(vikaTimer) clearTimeout(vikaTimer);
+    vikaTimer=setTimeout(()=>{ doVikaPush().catch(()=>{}); }, 800);
+  }
+  (function wireVika(){
+    const qc=sel=>document.querySelector(sel);
+    const fill=()=>{
+      const set=(sel,v)=>{ const e=qc(sel); if(e&&v!=null) e.value=v; };
+      set("#vikaDs", VIKA.dsId); set("#vikaToken", VIKA.token);
+      const a=qc("#vikaAuto"); if(a) a.checked=!!VIKA.auto;
+    };
+    fill();
+    const onSave=()=>{
+      VIKA={ dsId:(qc("#vikaDs").value||"").trim(), token:(qc("#vikaToken").value||"").trim(), auto:qc("#vikaAuto").checked };
+      try{ localStorage.setItem(VIKA_KEY, JSON.stringify(VIKA)); }catch(e){}
+      setVikaStatus(vikaEnabled()?"配置已保存，可初始化/上传":"请填齐 表格ID 与 API Token", !vikaEnabled());
+    };
+    const ps=qc(".vika-save"); if(ps) ps.addEventListener("click", onSave);
+    const pi=qc(".vika-init"); if(pi) pi.addEventListener("click", ()=>{ if(!vikaEnabled()){ setVikaStatus("请先填齐并保存",true); return; } vikaInitFields(); });
+    const pp=qc(".vika-push"); if(pp) pp.addEventListener("click", ()=>{ if(!vikaEnabled()){ setVikaStatus("请先填齐并保存",true); return; } doVikaPush(); });
+  })();
+
+  let orders = load();
+  let current = 0;
+  let viewAll = false;
+  let channelFilter = "all";
+  let lastOcrText = ""; /* 最近一次导入的 OCR 原文，用于删除后重渲染统计面板（同步合计） */
+  sortOrders(); /* 载入即按入住日期排序 */
+  function filteredIndices(){
+    if(channelFilter==="all") return orders.map((_,i)=>i);
+    return orders.map((_,i)=>i).filter(i=>chanOf(orders[i])===channelFilter);
+  }
+
+  /* 按入住日期升序排列订单（空日期排末尾）；保持 current 指向同一订单对象 */
+  /* 把「6月15日」或「2026-06-15」统一转成 "MM-DD"，补零后可直接字典序比较（含 10/11/12 月） */
+  function dateKey(s){
+    s=(""+(s||"")).trim();
+    let m=s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
+    if(m) return String(+m[1]).padStart(2,"0")+"-"+String(+m[2]).padStart(2,"0");
+    m=s.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if(m) return String(+m[2]).padStart(2,"0")+"-"+String(+m[3]).padStart(2,"0");
+    return s;
+  }
+  function sortOrders(){
+    const ref = (current!=null && orders[current]) ? orders[current] : null;
+    orders.sort((a,b)=>{
+      const x=(a&&a.stay&&a.stay.checkin)||"";
+      const y=(b&&b.stay&&b.stay.checkin)||"";
+      if(!x && !y) return 0;
+      if(!x) return 1;   // 空日期置后
+      if(!y) return -1;
+      const kx=dateKey(x), ky=dateKey(y);
+      return kx<ky ? -1 : (kx>ky ? 1 : 0);   // 月份/日期补零后字典序即正确顺序
+    });
+    if(ref){ const i=orders.indexOf(ref); if(i>=0) current=i; }
+  }
+
+  function money(n){ const neg=n<0; return (neg?"−":"")+"¥"+Math.abs(n).toFixed(2); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+  function setPath(obj,path,val){ const p=path.split("."); let o=obj; for(let i=0;i<p.length-1;i++) o=o[p[i]]; o[p[p.length-1]]=val; }
+  function amountOf(it){ return it.amount!=null ? Number(it.amount) : (Number(it.nights)||0)*(Number(it.price)||0); }
+
+  /* 预订渠道 */
+  const CHANNELS = ["直订","美团","携程","飞猪","去哪儿","抖音","其他"];
+  const CHAN_COLORS = { "直订":"#9a8c6d", "美团":"#f5a623", "携程":"#2f7ad6", "飞猪":"#ff7a1a", "去哪儿":"#12a594", "抖音":"#4a4a4a", "其他":"#8a8a8a" };
+  function chanOf(o){ return (o && o.channel) || "直订"; }
+  function chanColor(c){ return CHAN_COLORS[c] || "#8a8a8a"; }
+  function chanChip(o, editable){
+    const c=chanOf(o), col=chanColor(c);
+    const attr=editable?' data-act="cycleChannel" title="点击切换渠道"':'';
+    return `<span class="chan" style="color:${col};border-color:${col};background:${col}1f"${attr}>${esc(c)}</span>`;
+  }
+
+  /* 干净小票（用于导出/打印前快照，无编辑态） */
+  function plainReceiptHTML(o){
+    const rooms=o.rooms.map(it=>{
+      const amt=amountOf(it);
+      return `<div class="item"><div class="item-row"><div class="item-name">${esc(it.name)}</div>`
+        +`<div class="item-amt">${money(amt)}</div></div>`
+        +`<div class="item-spec">${esc(it.spec)}<span class="x">×</span>${it.nights}晚<span class="x">·</span>${money(Number(it.price)||0)}/晚</div></div>`;
+    }).join("");
+    const discs=(o.discounts||[]).map(d=>`<div class="t-row"><span class="k">${esc(d.label)}</span><span class="v minus">${money(Number(d.amount)||0)}</span></div>`).join("");
+    const s=o.stay||{};
+    const note=o.note?`<div class="note-box"><span class="k">备注</span>${esc(o.note)}</div>`:"";
+    const depRow=(o.deposit!=null&&Number(o.deposit))?`<div class="t-row"><span class="k">押金（可退）</span><span class="v">${money(Number(o.deposit)||0)}</span></div>`:"";
+    const cleanRow=(o.cleaning!=null)?`<div class="t-row"><span class="k">清洁费</span><span class="v">${money(Number(o.cleaning)||0)}</span></div>`:"";
+    return `<main class="receipt">`
+      +`<header class="brand"><div class="mark">${o.store.avatar?`<img src="${esc(o.store.avatar)}" alt="">`:esc(o.store.mark)}</div>`
+      +`<div class="brand-text"><div class="brand-name">${esc(o.store.name)}</div><div class="brand-sub">${esc(o.store.sub)}</div></div>`
+      +chanChip(o,false)
+      +`${o.paid?'<div class="paid">已支付</div>':'<div class="paid off">未支付</div>'}</header>`
+      +`<section class="meta"><div><div class="label">订单号</div><div class="val">${esc(o.orderNo)}</div></div>`
+      +`<div><div class="label">预订时间</div><div class="val">${esc(o.time)}</div></div></section>`
+      +`<section class="stay"><div class="col"><div class="k">入住</div><div class="d">${esc(s.checkin)}</div><div class="w">${esc(s.checkinWeek)}</div></div>`
+      +`<div class="col mid"><div class="arrow">→</div><div class="nights">${esc(s.nights)}晚</div></div>`
+      +`<div class="col" style="text-align:right"><div class="k">退房</div><div class="d">${esc(s.checkout)}</div><div class="w">${esc(s.checkoutWeek)}</div></div></section>`
+      +`<section><div class="section-title">房型 · 房晚</div><div class="items">${rooms}</div></section>`
+      +`<section class="totals"><div class="t-row"><span class="k">房费小计</span><span class="v">${money(Number(o.roomTotal)||0)}</span></div>`
+      +`${cleanRow}${depRow}${discs}`
+      +`<div class="t-row final"><span class="k">实付金额</span><span class="v">${money(Number(o.paidAmount)||0)}</span></div></section>`
+      +`<div class="guestpay"><span class="k">入住人</span>&nbsp;${esc(o.guest.name)}&nbsp;&nbsp;${esc(o.guest.phone)}`
+      +`&nbsp;<span class="k">支付</span>&nbsp;${esc(o.payment.method)}</div>`
+      +`${note}`
+      +`<div class="tear"><span class="txt">沿虚线撕开</span></div></main>`
+      +`<div class="torn" aria-hidden="true"></div>`;
+  }
+
+  /* 可编辑小票（点文字即改） */
+  function editableReceiptHTML(o){
+    const rooms=o.rooms.map((it,i)=>`
+      <div class="item">
+        <div class="item-row">
+          <div class="item-name ed" contenteditable="true" data-path="rooms.${i}.name">${esc(it.name)}</div>
+          <div class="item-amt"><span class="amt ed" contenteditable="true" data-num data-amt="${i}" data-path="rooms.${i}.amount" title="可直接修改；清空则恢复按 间夜×每晚 自动计算">${money(amountOf(it))}</span>${it.amount!=null?`<button class="row-del amt-reset" data-act="resetAmt" data-i="${i}" title="恢复自动计算">↺</button>`:``}</div>
+        </div>
+        <div class="item-spec">
+          <span class="ed" contenteditable="true" data-path="rooms.${i}.spec">${esc(it.spec)}</span>
+          <span class="x">×</span><span class="ed" contenteditable="true" data-num data-path="rooms.${i}.nights">${it.nights}</span>晚
+          <span class="x">·</span>¥<span class="ed" contenteditable="true" data-num data-path="rooms.${i}.price">${it.price}</span>/晚
+          <button class="row-del" data-act="delItem" data-i="${i}" title="删除房型">×</button>
+        </div>
+      </div>`).join("");
+
+    const discs=(o.discounts||[]).map((d,i)=>`
+      <div class="disc-row">
+        <span class="ed k" contenteditable="true" data-path="discounts.${i}.label">${esc(d.label)}</span>
+        <span class="disc-amt"><span>−¥</span><span class="ed" contenteditable="true" data-num data-negate data-path="discounts.${i}.amount">${Math.abs(Number(d.amount)||0)}</span></span>
+        <button class="row-del" data-act="delDisc" data-i="${i}" title="删除优惠">×</button>
+      </div>`).join("");
+
+    const sum=o.rooms.reduce((a,it)=>a+amountOf(it),0);
+    const s=o.stay||{};
+
+    return `<main class="receipt">
+      <header class="brand">
+        <div class="mark" title="头像">${o.store.avatar?`<img src="${esc(o.store.avatar)}" alt="">`:esc(o.store.mark)}</div>
+        <div class="brand-text">
+          <div class="brand-name ed" contenteditable="true" data-path="store.name">${esc(o.store.name)}</div>
+          <div class="brand-sub ed" contenteditable="true" data-path="store.sub">${esc(o.store.sub)}</div>
+        </div>
+        ${chanChip(o,true)}
+        <div class="paid ${o.paid?'':'off'}" data-act="togglePaid" title="点击切换">${o.paid?'已支付':'未支付'}</div>
+      </header>
+
+      <section class="meta">
+        <div><div class="label">订单号</div><div class="val ed" contenteditable="true" data-path="orderNo">${esc(o.orderNo)}</div></div>
+        <div><div class="label">预订时间</div><div class="val ed" contenteditable="true" data-path="time">${esc(o.time)}</div></div>
+      </section>
+
+      <section class="stay">
+        <div class="col">
+          <div class="k">入住</div>
+          <div class="d ed" contenteditable="true" data-path="stay.checkin">${esc(s.checkin)}</div>
+          <div class="w ed" contenteditable="true" data-path="stay.checkinWeek">${esc(s.checkinWeek)}</div>
+        </div>
+        <div class="col mid">
+          <div class="arrow">→</div>
+          <div class="nights"><span class="ed" contenteditable="true" data-num data-path="stay.nights">${esc(s.nights)}</span>晚</div>
+        </div>
+        <div class="col" style="text-align:right">
+          <div class="k">退房</div>
+          <div class="d ed" contenteditable="true" data-path="stay.checkout">${esc(s.checkout)}</div>
+          <div class="w ed" contenteditable="true" data-path="stay.checkoutWeek">${esc(s.checkoutWeek)}</div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-title">房型 · 房晚</div>
+        <div class="items">${rooms}</div>
+        <button class="add-btn" data-act="addItem">+ 添加房型</button>
+        <div class="hint-sm">房费合计 <b id="itemsTotal">${money(sum)}</b></div>
+      </section>
+
+      <section class="totals">
+        <div class="t-row"><span class="k">房费小计</span><span class="v">¥<span class="ed" contenteditable="true" data-num data-path="roomTotal">${o.roomTotal}</span></span></div>
+        <div class="t-row"><span class="k">清洁费</span><span class="v">¥<span class="ed" contenteditable="true" data-num data-path="cleaning">${o.cleaning}</span></span></div>
+        <div class="t-row"><span class="k">押金（可退）</span><span class="v">¥<span class="ed" contenteditable="true" data-num data-path="deposit">${o.deposit}</span></span></div>
+        ${discs}
+        <button class="add-btn" data-act="addDisc">+ 添加优惠</button>
+        <div class="t-row final"><span class="k">实付金额</span><span class="v">¥<span class="ed" contenteditable="true" data-num data-path="paidAmount">${o.paidAmount}</span></span></div>
+      </section>
+
+      <div class="guestpay">
+        <span class="k">入住人</span>&nbsp;<span class="ed" contenteditable="true" data-path="guest.name">${esc(o.guest.name)}</span>&nbsp;&nbsp;<span class="ed" contenteditable="true" data-path="guest.phone">${esc(o.guest.phone)}</span>
+        &nbsp;<span class="k">人数</span>&nbsp;<span class="ed" contenteditable="true" data-path="guest.guests">${esc(o.guest.guests)}</span>
+        &nbsp;<span class="k">支付</span>&nbsp;<span class="ed" contenteditable="true" data-path="payment.method">${esc(o.payment.method)}</span>
+      </div>
+
+      <div class="note-box"><span class="k">备注</span><span class="ed" contenteditable="true" data-path="note">${esc(o.note)}</span></div>
+
+      <div class="tear"><span class="txt">沿虚线撕开</span></div>
+    </main>
+    <div class="torn" aria-hidden="true"></div>`;
+  }
+
+  /* 渲染 */
+  function renderSelect(){
+    const sel=document.getElementById("orderSelect");
+    const idxs=filteredIndices();
+    const opts=['<option value="all">全部订单（共 '+idxs.length+' 笔）</option>']
+      .concat(idxs.map(i=>`<option value="${i}">${esc(orders[i].store.name)} · ${esc(orders[i].orderNo||'(未填)')}</option>`));
+    sel.innerHTML=opts.join("");
+    sel.value=viewAll?"all":current;
+    document.getElementById("orderCount").textContent="共 "+idxs.length+" 笔";
+  }
+  function renderChannelFilter(){
+    const sel=document.getElementById("channelFilter"); if(!sel) return;
+    const counts={}; orders.forEach(o=>{ const c=chanOf(o); counts[c]=(counts[c]||0)+1; });
+    if(channelFilter!=="all" && !counts[channelFilter]) channelFilter="all";
+    const present=CHANNELS.filter(c=>counts[c]);
+    const opts=['<option value="all">全部（'+orders.length+'）</option>']
+      .concat(present.map(c=>`<option value="${esc(c)}">${esc(c)}（${counts[c]}）</option>`));
+    sel.innerHTML=opts.join("");
+    sel.value=channelFilter;
+  }
+  function setChannelFilter(v){
+    channelFilter=v;
+    const idxs=filteredIndices();
+    if(!viewAll && !idxs.includes(current)){
+      if(idxs.length) current=idxs[0]; else viewAll=true;
+    }
+    renderAll();
+  }
+  function renderReceipt(){ document.getElementById("grandHost").innerHTML=""; document.getElementById("stage").innerHTML=editableReceiptHTML(orders[current]); }
+  function grandTotalHTML(idxs){
+    idxs=idxs||filteredIndices();
+    const list=idxs.map(i=>orders[i]);
+    const n=list.length;
+    const nights=list.reduce((a,o)=>a+(Number(o.stay&&o.stay.nights)||0),0);
+    const rooms=list.reduce((a,o)=>a+o.rooms.reduce((s,it)=>s+amountOf(it),0),0);
+    const clean=list.reduce((a,o)=>a+(Number(o.cleaning)||0),0);
+    const disc=list.reduce((a,o)=>a+((o.discounts||[]).reduce((d,x)=>d+(Number(x.amount)||0),0)),0);
+    const paid=list.reduce((a,o)=>a+(Number(o.paidAmount)||0),0);
+    const title=channelFilter==="all"?"全部订单 · 总合计":channelFilter+" 渠道 · 合计";
+    let html=`<div class="grand"><div class="g-title">${esc(title)}</div>`
+      +`<div class="g-row"><span class="k">订单数</span><span class="v">${n} 笔</span></div>`
+      +`<div class="g-row"><span class="k">总间夜</span><span class="v">${nights} 晚</span></div>`
+      +`<div class="g-row"><span class="k">房费合计</span><span class="v">${money(rooms)}</span></div>`
+      +`<div class="g-row"><span class="k">清洁费合计</span><span class="v">${money(clean)}</span></div>`
+      +`<div class="g-row"><span class="k">优惠合计</span><span class="v minus">${money(disc)}</span></div>`
+      +`<div class="g-row final"><span class="k">实付合计</span><span class="v">${money(paid)}</span></div>`;
+    if(channelFilter==="all"){
+      const by={};
+      orders.forEach(o=>{ const c=chanOf(o); (by[c]=by[c]||{n:0,paid:0}); by[c].n++; by[c].paid+=Number(o.paidAmount)||0; });
+      const present=CHANNELS.filter(c=>by[c]);
+      if(present.length){
+        html+=`<div class="g-sub">渠道分布</div>`;
+        present.forEach(c=>{ html+=`<div class="g-row"><span class="k"><span class="chan-dot" style="background:${chanColor(c)}"></span>${esc(c)} · ${by[c].n}笔</span><span class="v">${money(by[c].paid)}</span></div>`; });
+      }
+    }
+    return html+`</div>`;
+  }
+  function renderAllView(){
+    const idxs=filteredIndices();
+    const roll=idxs.map(i=>`<div class="rcard" data-idx="${i}">${plainReceiptHTML(orders[i])}</div>`).join("");
+    document.getElementById("grandHost").innerHTML=grandTotalHTML(idxs);
+    document.getElementById("stage").innerHTML='<div class="roll">'+roll+'</div>';
+  }
+  function flashReceipt(){
+    const s=document.getElementById("stage");
+    if(!s) return;
+    try{ s.scrollIntoView({behavior:"smooth", block:"start"}); }catch(e){}
+    s.classList.remove("flash"); void s.offsetWidth; s.classList.add("flash");
+  }
+  function renderAll(){
+    renderChannelFilter(); renderSelect();
+    if(orders.length===0){
+      document.getElementById("grandHost").innerHTML="";
+      document.getElementById("stage").innerHTML='<div class="empty-state"><div class="empty-ico">🧾</div><div class="empty-title">还没有订单</div><div class="empty-sub">点击顶部「上传截图识别」上传订单截图（自动识别全部订单或单笔详情），小票会自动生成在这里</div></div>';
+      return;
+    }
+    if(viewAll) renderAllView(); else renderReceipt();
+  }
+  function selectOrder(v){
+    if(v==="all"){ viewAll=true; }
+    else { viewAll=false; current=parseInt(v,10)||0; }
+    renderAll();
+  }
+
+  /* 删除指定订单：同步刷新小票卷总合计 + 底部统计面板的合计（删除后不再过期） */
+  function deleteOrder(index){
+    if(index==null || isNaN(index) || index<0 || index>=orders.length) return;
+    orders.splice(index,1);
+    if(index<current) current=Math.max(0,current-1);
+    if(current>=orders.length) current=Math.max(0,orders.length-1);
+    sortOrders();
+    renderAll();
+    try{ if(lastOcrText) showStatPanel(orders, lastOcrText); }catch(e){}
+    save();
+  }
+
+  function updateDerived(){
+    if(!orders.length) return;
+    const wrap=document.getElementById("stage");
+    orders[current].rooms.forEach((it,i)=>{
+      const a=wrap.querySelector('.amt[data-amt="'+i+'"]');
+      if(a && it.amount==null) a.textContent=money(amountOf(it));
+    });
+    const t=document.getElementById("itemsTotal");
+    if(t){ const s=orders[current].rooms.reduce((a,it)=>a+amountOf(it),0); t.textContent=money(s); }
+  }
+
+  /* 行内编辑：输入即写回模型（不重渲染，保持光标） */
+  const stage=document.getElementById("stage");
+  stage.addEventListener("input",e=>{
+    const el=e.target.closest("[data-path]"); if(!el) return;
+    let val=el.textContent;
+    if(el.dataset.num!==undefined){
+      const raw=String(val).replace(/[^\d.\-]/g,"");
+      let n=parseFloat(raw); if(isNaN(n)) n=0;
+      val=n;
+      if(el.dataset.negate!==undefined) val=-Math.abs(n);
+      if(el.dataset.amt!==undefined && raw.trim()==="") val=null;
+    }
+    setPath(orders[current], el.dataset.path, val);
+    const p=el.dataset.path;
+    if(/^rooms\.\d+\.(nights|price|amount)$/.test(p)) updateDerived();
+    if(el.dataset.amt!==undefined){
+      const idx=el.dataset.amt;
+      const btn=stage.querySelector('.amt-reset[data-i="'+idx+'"]');
+      const over=orders[current].rooms[idx].amount!=null;
+      if(btn) btn.style.display=over?"":"none";
+    }
+    save();
+  });
+  /* 结构操作：增删房型/优惠、切换已支付 */
+  stage.addEventListener("click",e=>{
+    const btn=e.target.closest("[data-act]"); if(!btn) return;
+    const act=btn.dataset.act, i=btn.dataset.i!==undefined?+btn.dataset.i:null;
+    if(act==="addItem") orders[current].rooms.push({name:"新房型",spec:"可住5人",nights:1,price:399.00,amount:null});
+    else if(act==="delItem") orders[current].rooms.splice(i,1);
+    else if(act==="addDisc") orders[current].discounts.push({label:"优惠",amount:-10});
+    else if(act==="delDisc") orders[current].discounts.splice(i,1);
+    else if(act==="togglePaid") orders[current].paid=!orders[current].paid;
+    else if(act==="cycleChannel"){
+      const idx=CHANNELS.indexOf(chanOf(orders[current]));
+      orders[current].channel=CHANNELS[(idx+1)%CHANNELS.length];
+      if(channelFilter!=="all" && chanOf(orders[current])!==channelFilter) channelFilter="all";
+      save(); renderAll(); return;
+    }
+    else if(act==="resetAmt"){ orders[current].rooms[i].amount=null; renderReceipt(); save(); }
+    else return;
+    renderReceipt(); save();
+  });
+  /* 左右滑删除（类似 iOS 邮件列表）：「全部」视图下，从每张小票的非编辑区向左滑动超过阈值即飞出删除；页面可正常竖向滚动 */
+  let swipe=null;
+  function swipeMove(e){
+    if(!swipe) return;
+    const dx=e.clientX-swipe.x, dy=e.clientY-swipe.y;
+    swipe.dx=dx; swipe.dy=dy;
+    if(Math.abs(dx)>Math.abs(dy) && dx<0){
+      if(!swipe.moved){ swipe.moved=true; }
+      if(e.cancelable) e.preventDefault();
+      const t=Math.max(dx,-160);
+      swipe.card.style.transform="translateX("+t+"px)";
+      swipe.card.style.opacity=String(Math.max(0.15,1+t/200));
+      swipe.card.classList.toggle("fly-hint", t<-80);
+    } else if(swipe.moved && (Math.abs(dx)<=Math.abs(dy) || dx>=0)){
+      swipe.card.style.transform=""; swipe.card.style.opacity=""; swipe.card.classList.remove("fly-hint");
+    }
+  }
+  function swipeEnd(){
+    if(!swipe) return;
+    const s=swipe; swipe=null;
+    window.removeEventListener("pointermove",swipeMove);
+    window.removeEventListener("pointerup",swipeEnd);
+    window.removeEventListener("pointercancel",swipeEnd);
+    if(s.moved && s.dx<-80){
+      s.card.style.transform=""; s.card.style.opacity="";
+      s.card.classList.remove("fly-hint");
+      s.card.classList.add("fly");
+      setTimeout(()=>deleteOrder(s.idx), 320);   /* 等飞出动画结束再删除并同步合计 */
+    } else {
+      s.card.style.transform=""; s.card.style.opacity=""; s.card.classList.remove("fly-hint");
+    }
+  }
+  stage.addEventListener("pointerdown",e=>{
+    if(!viewAll) return;
+    const card=e.target.closest(".rcard"); if(!card) return;
+    if(e.target.closest('[contenteditable="true"],button,a,input')) return; /* 编辑/按钮不触发滑动删除 */
+    swipe={ card, idx:+card.dataset.idx, x:e.clientX, y:e.clientY, dx:0, dy:0, moved:false };
+    window.addEventListener("pointermove",swipeMove);
+    window.addEventListener("pointerup",swipeEnd);
+    window.addEventListener("pointercancel",swipeEnd);
+  });
+  /* 触屏左右滑删除时阻止卡片被横向选中/拖动（仅横向手势拦截，不影响页面竖向滚动） */
+  stage.addEventListener("touchmove",e=>{
+    if(swipe && swipe.moved && Math.abs(swipe.dx)>Math.abs(swipe.dy) && swipe.dx<0 && e.cancelable) e.preventDefault();
+  },{passive:false});
+  /* 粘贴纯文本，避免带格式 */
+  document.addEventListener("paste",e=>{
+    if(e.target.isContentEditable){
+      e.preventDefault();
+      const text=(e.clipboardData||window.clipboardData).getData("text/plain");
+      document.execCommand("insertText",false,text);
+    }
+  });
+
+  /* 顶栏 + 操作栏（新建/复制等移到了小票上方，统一在 .wrap 上委托） */
+  document.querySelector(".wrap").addEventListener("click",e=>{
+    const btn=e.target.closest("[data-top]"); if(!btn) return;
+    const act=btn.dataset.top;
+    if(act==="new"){ orders.push(blankOrder()); current=orders.length-1; sortOrders(); viewAll=false; renderAll(); save(); }
+    else if(act==="dup"){ if(!orders.length){ orders.push(blankOrder()); current=orders.length-1; } else { orders.splice(current+1,0,JSON.parse(JSON.stringify(orders[current]))); current++; } sortOrders(); viewAll=false; renderAll(); save(); }
+    else if(act==="del"){
+      if(orders.length) deleteOrder(current);
+    }
+    else if(act==="reset"){
+      if(confirm("确定清空所有订单？此操作不可撤销。")){
+        try{ localStorage.removeItem(KEY); }catch(e){}
+        orders=[]; current=0; viewAll=true; lastOcrText="";
+        try{ const sp=document.getElementById("statPanel"); if(sp){ sp.hidden=true; sp.innerHTML=""; } }catch(e){}
+        try{ const os=document.getElementById("ocrStatus"); if(os) os.textContent=""; }catch(e){}
+        try{ const ot=document.getElementById("ocrText"); if(ot) ot.textContent=""; }catch(e){}
+        renderAll(); save();
+      }
+    }
+    else if(act==="export"){ exportHTML(); }
+    else if(act==="print"){ window.print(); }
+    else if(act==="tdoc"){ exportToTencentDocs(); }
+    else if(act==="ocr"){ document.getElementById("ocrFile").click(); }
+  });
+
+  /* 截图识别：按需从 CDN 加载 Tesseract.js，OCR 后启发式填单（民宿场景） */
+  const ocrFile=document.getElementById("ocrFile");
+  ocrFile.addEventListener("change",e=>{
+    /* 先 Array.from 做快照：某些 webview 下 e.target.files 是实时对象，紧跟的 value="" 会把它清空，导致读到空列表 */
+    const fs=Array.from(e.target.files||[]);
+    try{ e.target.value=""; }catch(_){}
+    try{
+      if(fs.length>1){ setOcr("已选择 "+fs.length+" 张图片，开始逐张识别…"); runMultiOCR(fs); }
+      else if(fs.length===1){ setOcr("已选择 1 张图片，开始识别…"); runOCR(fs[0],"form"); }
+      else { setOcr("未读取到图片，请重新选择","err"); }
+    }catch(err){ setOcr("处理出错："+(err&&err.message||err),"err"); }
+  });
+
+  /* 云同步面板交互 */
+  let tessReady=null, engWorker=null;
+  /* 资源源（均带 CORS）；worker 转同源 Blob 规避跨域 Worker 限制；core/lang 主线程先探测可达性 */
+  const SCRIPT_SRCS=[
+    "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+    "https://fastly.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+    "https://gcore.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+    "https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js",
+    "https://cdn.npmmirror.com/tesseract.js@5.1.1/dist/tesseract.min.js"
+  ];
+  const WORKER_SRCS=[
+    "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+    "https://fastly.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+    "https://gcore.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js",
+    "https://unpkg.com/tesseract.js@5.1.1/dist/worker.min.js",
+    "https://cdn.npmmirror.com/tesseract.js@5.1.1/dist/worker.min.js"
+  ];
+  const CORE_SRCS=[
+    "https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/tesseract-core.wasm.js",
+    "https://fastly.jsdelivr.net/npm/tesseract.js-core@5.1.1/tesseract-core.wasm.js",
+    "https://gcore.jsdelivr.net/npm/tesseract.js-core@5.1.1/tesseract-core.wasm.js",
+    "https://unpkg.com/tesseract.js-core@5.1.1/tesseract-core.wasm.js"
+  ];
+  const LANG_SRCS=[
+    "https://cdn.jsdelivr.net/npm/@tesseract.js-data/chi_sim/4.0.0",
+    "https://fastly.jsdelivr.net/npm/@tesseract.js-data/chi_sim/4.0.0",
+    "https://gcore.jsdelivr.net/npm/@tesseract.js-data/chi_sim/4.0.0",
+    "https://cdn.jsdelivr.net/npm/@tesseract.js-data/chi_sim/4.0.0_best_int"
+  ];
+  function loadScriptSrc(src){ return new Promise((res,rej)=>{
+    var to=setTimeout(function(){ rej(new Error("脚本加载超时(15s)")); },15000);
+    var s=document.createElement("script"); s.src=src;
+    s.onload=function(){ clearTimeout(to); res(); };
+    s.onerror=function(){ clearTimeout(to); rej(new Error("脚本加载失败")); };
+    document.head.appendChild(s);
+  }); }
+  async function toBlobUrl(url){
+    try{
+      var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },8000);
+      const r=await fetch(url,{signal:ctrl.signal}); clearTimeout(to);
+      if(!r.ok) throw new Error("HTTP "+r.status); const t=await r.text();
+      const u=URL.createObjectURL(new Blob([t],{type:"application/javascript"}));
+      /* 页面 origin 不透明时（如 file:// 直接打开、沙箱 iframe），createObjectURL 会得到
+         "blob:null/..."，这种 blob 在 Worker 内 importScripts 会报 NetworkError。此时返回 null，
+         让 loadTesseract 回退到原始跨域 WORKER 地址（Tesseract.js 默认即跨域加载 worker）。 */
+      if(!u || u.indexOf("blob:null")===0) return null;
+      return u;
+    }catch(e){ return null; }
+  }
+  async function pickReachable(urls){
+    for(const u of urls){
+      try{
+        var ctrl=new AbortController();
+        var to=setTimeout(function(){ ctrl.abort(); },8000);
+        /* 不带 Range 头：Range 会触发 CORS 预检，而 jsdelivr 预检不返回 Access-Control-Allow-Headers → 浏览器直接拒绝 fetch，导致所有源都被判"不可达"。改用简单 GET（无自定义头 → 不触发预检）。 */
+        const r=await fetch(u,{method:"GET",signal:ctrl.signal});
+        clearTimeout(to);
+        var ok=r.ok||r.status===206;
+        try{ if(r.body&&r.body.cancel) r.body.cancel(); }catch(_){}
+        if(ok) return u;
+      }catch(e){}
+    }
+    return null;
+  }
+  async function loadTesseract(){
+    if(tessReady) return tessReady;
+    tessReady=(async()=>{
+      let lastErr;
+      for(let i=0;i<SCRIPT_SRCS.length;i++){
+        try{
+          setOcr("正在加载识别引擎…");
+          await loadScriptSrc(SCRIPT_SRCS[i]);
+          if(!window.Tesseract) throw new Error("引擎未挂载");
+          const w=await toBlobUrl(WORKER_SRCS[i]);
+          engWorker=(w && w.indexOf("blob:null")!==0)? w : WORKER_SRCS[i];
+          return { T:window.Tesseract };
+        }catch(e){ lastErr=e; }
+      }
+      throw new Error("OCR 引擎加载失败：所有 CDN 均不可达。请确认网络通畅后重试。");
+    })();
+    return tessReady;
+  }
+  function setOcr(msg,type){ const el=document.getElementById("ocrStatus"); if(el){ el.textContent=msg||""; el.className="ocr-status"+(type?(" "+type):""); } }
+  /* 统计页导出图片：按需加载 html-to-image（纯 JS，无 worker），多 CDN 回退 */
+  const HTMLTOIMG_SRCS=[
+    "https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js",
+    "https://fastly.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js",
+    "https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"
+  ];
+  let htmlToImgReady=null;
+  async function loadHtmlToImage(){
+    if(htmlToImgReady) return htmlToImgReady;
+    let lastErr;
+    for(const src of HTMLTOIMG_SRCS){
+      try{
+        await loadScriptSrc(src);
+        if(window.htmlToImage && window.htmlToImage.toPng){ htmlToImgReady=window.htmlToImage; return htmlToImgReady; }
+        throw new Error("图片库未挂载");
+      }catch(e){ lastErr=e; }
+    }
+    throw new Error("图片导出库加载失败，请检查网络后重试");
+  }
+  function parsePrice(s){
+    const m=s.match(/[¥￥]?\s*([0-9][0-9,]*\.?\d*)/);
+    return m?parseFloat(m[1].replace(/,/g,"")):null;
+  }
+  /* OCR 前图片预处理：放大 + 轻度对比增强，提升密集小字列表的识别完整度 */
+  function preprocessImage(file){
+    return new Promise(res=>{
+      try{
+        const img=new Image();
+        img.onload=()=>{
+          try{
+            const targetW=1500;
+            const scale=Math.min(3, Math.max(1, targetW/(img.width||targetW)));
+            const w=Math.round(img.width*scale), h=Math.round(img.height*scale);
+            const c=document.createElement('canvas'); c.width=w; c.height=h;
+            const ctx=c.getContext('2d');
+            ctx.drawImage(img,0,0,w,h);
+            const d=ctx.getImageData(0,0,w,h);
+            const f=1.25, b=-18;
+            for(let i=0;i<d.data.length;i+=4){
+              for(let k=0;k<3;k++){
+                let v=(d.data[i+k]-128)*f+128+b;
+                d.data[i+k]=v<0?0:(v>255?255:v);
+              }
+            }
+            ctx.putImageData(d,0,0);
+            c.toBlob(b=>res(b||file),'image/png');
+          }catch(e){ res(file); }
+        };
+        img.onerror=()=>res(file);
+        img.src=URL.createObjectURL(file);
+      }catch(e){ res(file); }
+    });
+  }
+  async function recognizeImage(file){
+    setOcr("准备识别…");
+    const eng=await loadTesseract();
+    let img=file;
+    try{ setOcr("正在预处理图片（放大+增强对比，提升小字识别率）…"); img=await preprocessImage(file); }
+    catch(e){ img=file; }
+    setOcr("正在定位识别资源（中文库/引擎）…");
+    const core=await pickReachable(CORE_SRCS);
+    const langProbe=LANG_SRCS.map(u=>u.replace(/\/$/,'')+'/chi_sim.traineddata.gz');
+    const langHit=await pickReachable(langProbe);
+    const lang=langHit?LANG_SRCS[langProbe.indexOf(langHit)]:null;
+    if(!core||!lang) throw new Error("识别资源不可达（core="+(core?"OK":"×")+", lang="+(lang?"OK":"×")+"），请检查网络或换网络后重试");
+    setOcr("正在识别图片文字（首次需下载中文识别库，约十几 MB，请稍候）…");
+    const { data }=await eng.T.recognize(img,"chi_sim",{
+      logger:m=>{ if(m.status==="recognizing text") setOcr("识别中 "+Math.round((m.progress||0)*100)+"%"); },
+      workerPath:engWorker,
+      corePath:core,
+      langPath:lang
+    });
+    return (data.text||"").trim();
+  }
+  function isListish(text, parsed){
+    return parsed.length>=2 || (parsed.length===1 && /(已完成|待入住|待支付|已取消|来自美团|来自携程|来自去哪儿|来自飞猪|订单号|共\s*\d+\s*晚)/.test(text));
+  }
+  async function runOCR(file, mode){
+    try{
+      const text=await recognizeImage(file);
+      const rt=document.getElementById("ocrText"); if(rt) rt.textContent=text;
+      if(!text){ setOcr("未识别到文字，请换一张更清晰的截图，或在小票上手动填写","err"); return; }
+      const parsed=parseOrdersFromList(text);
+      setOcr("识别到 "+text.length+" 字，正在生成小票…");
+      if(mode==="stat"){
+        importOrders(parsed, text);
+        setOcr(parsed.length?("已导入列表订单 "+parsed.length+" 笔（见下方面板）"):"未识别到列表订单，见下方诊断");
+        flashReceipt();
+      } else {
+        // 识别截图：自动判断是「订单列表」还是「单笔订单详情」
+        const listish = isListish(text, parsed);
+        if(listish){
+          importOrders(parsed, text);
+          setOcr("识别为订单列表，已导入 "+parsed.length+" 笔（见下方面板）");
+          flashReceipt();
+        } else {
+          const before=JSON.stringify(orders[current]||{});
+          applyOCR(text);
+          const after=JSON.stringify(orders[current]||{});
+          if(before===after){
+            setOcr("识别到 "+text.length+" 字，但没解析出订单字段。已展开「识别原文」，请手动补充或换张更清晰的图","err");
+          } else {
+            setOcr("已按单笔订单详情填充，请核对并在小票上修正（识别原文见下方）");
+          }
+          flashReceipt();
+        }
+      }
+      setTimeout(()=>setOcr(""),6000);
+    }catch(err){ setOcr("识别失败："+(err&&err.message||err),"err"); }
+  }
+  function fillOrderFromDetail(text, o){
+    const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const rooms=[]; let roomTotal=null,cleaning=null,deposit=null,paid=null,nights=null,checkin=null,checkout=null,storeName=null,guestName=null,guestPhone=null;
+    const discounts=[];
+    for(const line of lines){
+      // 日期（入住 / 退房）
+      const dm=line.match(/(20\d{2}[-/.]\d{1,2}[-/.]\d{1,2})/g);
+      if(dm){
+        const D=i=>dm[i].replace(/[/.]/g,"-");
+        const hasIn=/入住|check.?in|到店/i.test(line), hasOut=/退房|check.?out|离店/i.test(line);
+        if(hasIn&&hasOut&&dm.length>=2){ checkin=D(0); checkout=D(1); }
+        else if(hasIn){ checkin=D(0); if(dm.length>=2&&!checkout) checkout=D(1); }
+        else if(hasOut){ checkout=D(0); }
+        else if(dm.length>=2){ checkin=D(0); checkout=D(1); }
+      }
+      // 间夜
+      const nm=line.match(/(\d+)\s*(晚|夜|nights?)/i); if(nm) nights=parseInt(nm[1],10);
+      // 电话
+      const pm=line.match(/(1[3-9]\d{9}|1[3-9]\d[\s\-*]{2,}\d{4})/); if(pm && !guestPhone) guestPhone=pm[0];
+      if(/清洁费|保洁费/.test(line)){ const p=parsePrice(line); if(p!=null) cleaning=p; continue; }
+      if(/押金|保证金|定金/.test(line)){ const p=parsePrice(line); if(p!=null) deposit=p; continue; }
+      if(/优惠|折扣|满减|立减|优惠券|红包|特惠|减免/.test(line)){ const p=parsePrice(line); if(p!=null) discounts.push({label:(line.replace(/[¥￥]\s*[0-9][0-9,]*\.?\d*/g,"").trim().replace(/^[\s\-－]+|[\s\-－]+$/g,"")||"优惠").slice(0,14), amount:-Math.abs(p)}); continue; }
+      if(/实付|应付|实付款|支付金额|总价|合计|总计|需付款|订单金额/.test(line)){ const p=parsePrice(line); if(p!=null) paid=p; continue; }
+      if(/房费|房价|小计|房晚小计/.test(line)){ const p=parsePrice(line); if(p!=null) roomTotal=p; continue; }
+      // 房型行：含 ¥/房/房型/床/间 且带价格
+      const ms=[...line.matchAll(/[¥￥]\s*([0-9][0-9,]*\.?\d*)/g)];
+      if(ms.length){
+        const amt=parseFloat(ms[ms.length-1][1].replace(/,/g,""));
+        let name=line.replace(/[¥￥]\s*[0-9][0-9,]*\.?\d*/g,"").replace(/\s+/g," ").trim();
+        name=name.replace(/^[\s×xX*]*\d+[\s×xX*]*/,"").trim();
+        let spec="";
+        const sm=name.match(/可住\s*\d+\s*人/); if(sm){ spec=sm[0]; name=name.replace(sm[0],"").trim(); }
+        name=name.replace(/含[^，,。；;\s]*/g,"").replace(/[·・]/g,"").replace(/\s+/g," ").trim();
+        if(name) rooms.push({name:name.slice(0,40),spec:spec,nights:(nights||1),price:amt,amount:null});
+      }
+    }
+    if(!storeName) for(const l of lines){ if(/民宿|客栈|酒店|山居|小院|旅舍|公寓|度假/.test(l)&&l.length<=20){ storeName=l; break; } }
+    if(!guestName) for(const l of lines){ const gm=l.match(/(?:入住人|客人|联系人|姓名)[：: ]\s*([^\s，,。;；]{2,6})/); if(gm){ guestName=gm[1]; break; } }
+    // 预订渠道（据平台关键词判断）
+    let channel=null; const full=lines.join(" ");
+    if(/美团|大众点评/.test(full)) channel="美团";
+    else if(/携程|trip\.?com/i.test(full)) channel="携程";
+    else if(/去哪儿|qunar/i.test(full)) channel="去哪儿";
+    else if(/飞猪|阿里/.test(full)) channel="飞猪";
+    else if(/抖音|抖店|douyin/i.test(full)) channel="抖音";
+    else if(/爱彼迎|airbnb/i.test(full)) channel="其他";
+    if(channel) o.channel=channel;
+    if(storeName) o.store.name=storeName;
+    if(rooms.length) o.rooms=rooms;
+    o.stay=o.stay||{};
+    if(nights!=null) o.stay.nights=nights;
+    if(checkin) o.stay.checkin=checkin;
+    if(checkout) o.stay.checkout=checkout;
+    if(roomTotal!=null) o.roomTotal=roomTotal;
+    if(cleaning!=null) o.cleaning=cleaning;
+    if(deposit!=null) o.deposit=deposit;
+    if(discounts.length) o.discounts=discounts;
+    if(paid!=null) o.paidAmount=paid;
+    o.guest=o.guest||{};
+    if(guestName) o.guest.name=guestName;
+    if(guestPhone) o.guest.phone=guestPhone;
+  }
+  function applyOCR(text){
+    if(!orders.length){ orders.push(blankOrder()); current=0; }
+    fillOrderFromDetail(text, orders[current]);
+    sortOrders();
+    viewAll=false; renderAll(); save();
+  }
+  /* 识别截图·多图：逐张 OCR，每张自动判断列表/单笔详情，合并全部订单后导入 */
+  async function runMultiOCR(files){
+    try{
+      const out=[]; let lastText="";
+      for(let i=0;i<files.length;i++){
+        setOcr("正在识别第 "+(i+1)+"/"+files.length+" 张…");
+        const text=await recognizeImage(files[i]);
+        lastText+=(lastText?"\n\n":"")+text;
+        const parsed=parseOrdersFromList(text);
+        if(isListish(text, parsed) && parsed.length){
+          for(const p of parsed) out.push(orderFromParsed(p));
+        } else {
+          const o=blankOrder(); fillOrderFromDetail(text, o); out.push(o);
+        }
+      }
+      const rt=document.getElementById("ocrText"); if(rt) rt.textContent=lastText;
+      lastOcrText=lastText;
+      if(!out.length){ importOrders([], lastText); return; }
+      const beforeAll=orders.length;                       // 已保存的笔数
+      orders = dedupe(orders.concat(out), o=>o.paidAmount, o=>o.stay&&o.stay.checkin, o=>o.stay&&o.stay.checkout);  // 合并新识别的，再去重
+      sortOrders();
+      const added=orders.length-beforeAll;                 // 真正新增的笔数
+      const dupSkipped=out.length-added;                   // 新批次中被判为重复、跳过的笔数
+      current=orders.length-1;
+      showStatPanel(orders, lastText);
+      viewAll=true; renderAll(); save();
+      setOcr("已识别 "+files.length+" 张图，新增 "+added+" 笔订单"+(dupSkipped>0?("；跳过重复 "+dupSkipped+" 笔"):"")+"，当前共 "+orders.length+" 笔（见下方面板）");
+      flashReceipt();
+      setTimeout(()=>setOcr(""),6000);
+    }catch(err){ setOcr("识别失败："+(err&&err.message||err),"err"); }
+  }
+
+  /* 列表页金额统计：提取所有订单金额并汇总（其余字段忽略） */
+  function applyStat(text){
+    const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const rows=[], others=[];
+    const amtRe=/(?:[¥￥]|Y)\s*([0-9][0-9,]*\.?\d*)/g;
+    const pairRe=/(\d{1,2}[./]\d{1,2}\s*[-–~—]\s*\d{1,2}[./]\d{1,2})\s+(\d+)\s*晚[^\n]*?(?:[¥￥]|Y)\s*([0-9][0-9,]*\.?\d*)/;
+    for(const line of lines){
+      let work=line;
+      const pm=line.match(pairRe);
+      if(pm){
+        rows.push({ date:pm[1].replace(/\//g,"-"), nights:parseInt(pm[2],10), amount:parseFloat(pm[3].replace(/,/g,"")) });
+        work=line.replace(pm[0],"");
+      }
+      let m; amtRe.lastIndex=0;
+      while((m=amtRe.exec(work))){
+        const v=parseFloat(m[1].replace(/,/g,""));
+        if(v>0 && v<1000000) others.push(v);
+      }
+    }
+    const all=rows.map(r=>r.amount).concat(others);
+    const sum=all.reduce((a,b)=>a+b,0);
+    const panel=document.getElementById("statPanel");
+    if(!all.length){
+      panel.hidden=false;
+      panel.innerHTML='<div class="stat-empty">未识别到金额，请换一张更清晰的订单列表截图</div>';
+      return;
+    }
+    let html='<div class="stat-head">订单列表金额统计 · 共 <b>'+all.length+'</b> 笔 · 合计 <b>¥'+sum.toFixed(2)+'</b></div>';
+    html+='<div class="stat-list">';
+    rows.forEach(r=>{
+      html+='<div class="stat-item"><span class="d">'+r.date+' · '+r.nights+'晚</span><span class="amt">¥'+r.amount.toFixed(2)+'</span></div>';
+    });
+    others.forEach((v,i)=>{
+      html+='<div class="stat-item muted"><span class="d">其他金额 '+(i+1)+'</span><span class="amt">¥'+v.toFixed(2)+'</span></div>';
+    });
+    html+='</div>';
+    html+='<button class="btn stat-copy" id="statCopy">复制合计 ¥'+sum.toFixed(2)+'</button>';
+    panel.hidden=false; panel.innerHTML=html;
+    const cp=document.getElementById("statCopy");
+    if(cp) cp.addEventListener("click",()=>{
+      if(navigator.clipboard) navigator.clipboard.writeText("合计 ¥"+sum.toFixed(2)+"（共"+all.length+"笔）");
+      cp.textContent="已复制"; setTimeout(()=>cp.textContent="复制合计 ¥"+sum.toFixed(2),1500);
+    });
+  }
+
+  /* 列表页 → 解析为多条订单：以每笔金额为锚点，向后配对最近日期、区间内渠道/人数 */
+  function detectChannel(s){
+    if(/美\s*团|大众点评|来自\s*美/.test(s)) return "美团";
+    if(/携\s*程|携程|trip\.?com/i.test(s)) return "携程";
+    if(/去\s*哪儿|去哪儿|qunar/i.test(s)) return "去哪儿";
+    if(/飞\s*猪|阿里/.test(s)) return "飞猪";
+    if(/抖\s*音/.test(s)) return "抖音";
+    if(/途\s*家|tujia/i.test(s)) return "途家";
+    if(/爱彼迎|airbnb/i.test(s)) return "其他";
+    return null;
+  }
+  function fmtDate(s){
+    if(!s) return s;
+    const m=(""+s).match(/(\d{1,2})\s*[./]\s*(\d{1,2})/);
+    if(!m) return s;
+    return parseInt(m[1],10)+"月"+parseInt(m[2],10)+"日";
+  }
+  /* ---- 去重：同金额 + 相同/重叠的入住区间 → 视为同一笔被重复识别 ---- */
+  function md(s){ const m=(""+(s||"")).match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日/); return m?{m:+m[1],d:+m[2]}:null; }
+  function dedupe(arr, getAmt, getCi, getCo){
+    const res=[];
+    for(const it of arr){
+      const amt=Number(getAmt(it)||0);
+      if(amt<=0){ res.push(it); continue; }            // 金额未知/为 0 不参与去重，避免误并
+      const ci=md(getCi(it)), co=md(getCo(it));
+      let dup=false;
+      for(const x of res){
+        if(Number(getAmt(x)||0)!==amt) continue;        // 金额不同 → 不是同一笔
+        const xci=md(getCi(x)), xco=md(getCo(x));
+        if(ci&&co&&xci&&xco){
+          if(ci.m===xci.m&&ci.d===xci.d&&co.m===xco.m&&co.d===xco.d){ dup=true; break; }   // 区间完全一致（同一张图重复上传/OCR抖动）才合并
+        }
+      }
+      if(!dup) res.push(it);
+    }
+    return res;
+  }
+  /* 列表页 → 解析为多条订单（以「日期区间」为锚点，点可缺，逐笔配对金额/平台/晚数/人数） */
+  function parseOrdersFromList(text){
+    const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const rangeRe=/(\d{1,2})\s*[./\s]?\s*(\d{1,2})\s*[-–~—]\s*(\d{1,2})\s*[./\s]?\s*(\d{1,2})/g;
+    const ranges=[];
+    for(let i=0;i<lines.length;i++){
+      let m; rangeRe.lastIndex=0;
+      while((m=rangeRe.exec(lines[i]))){
+        const g=[m[1],m[2],m[3],m[4]].map(Number);
+        if(g[0]<1||g[0]>12) continue;
+        if(g[2]<1||g[2]>12) continue;
+        if(g[1]<1||g[1]>31) continue;
+        if(g[3]<1||g[3]>31) continue;
+        ranges.push({ line:i, ci:`${g[0]}.${g[1]}`, co:`${g[2]}.${g[3]}` });
+      }
+    }
+    if(!ranges.length) return [];
+    // 金额：优先"带货币符号"；兜底"带小数点的纯数字(>31，排除日期/人数/房号)"
+    const symRe=/(?:[¥￥Y£€$✱＊*=～≈#“”‘’「」vVx%]\s*|\*)\s*([0-9][0-9,]*\.?\d*)/g;
+    const decRe=/([0-9][0-9,]*\.\d{1,2})\b/g;
+    const sym=[], dec=[];
+    for(let i=0;i<lines.length;i++){
+      let m; symRe.lastIndex=0; while((m=symRe.exec(lines[i]))){ const v=parseFloat(m[1].replace(/,/g,"")); if(v>31 && v<1000000) sym.push({ line:i, value:v }); }
+      let n; decRe.lastIndex=0; while((n=decRe.exec(lines[i]))){ const v=parseFloat(n[1].replace(/,/g,"")); if(v>31 && v<1000000) dec.push({ line:i, value:v }); }
+    }
+    const out=[];
+    for(let k=0;k<ranges.length;k++){
+      const r=ranges[k];
+      const nextLine=k+1<ranges.length?ranges[k+1].line:lines.length;
+      const prevLine=k>0?ranges[k-1].line:0;
+      let bestAmt=null,bestDist=1e9;
+      // 金额可能出现在日期行上方（途家，如"已离店/¥308.70/去哪儿"在日期之上）或下方（美团），
+      // 因此在上一日期线到下一日期线之间整段搜索，取离当前日期行最近的金额。
+      for(const a of sym){
+        if(a.line>prevLine && a.line<nextLine){
+          const d=Math.abs(a.line-r.line);
+          if(d<bestDist){ bestDist=d; bestAmt=a.value; }
+        }
+      }
+      if(bestAmt==null){
+        for(const a of dec){
+          if(a.line>prevLine && a.line<nextLine){
+            const d=Math.abs(a.line-r.line);
+            if(d<bestDist){ bestDist=d; bestAmt=a.value; }
+          }
+        }
+      }
+      const win=lines.slice(Math.max(0,r.line-6), Math.min(lines.length,r.line+3)).join("\n");
+      let channel=detectChannel(win);
+      if(!channel && k===0) channel=detectChannel(lines.join("\n"));
+      const local=lines.slice(r.line, Math.min(lines.length,r.line+2)).join("\n");
+      let nights=1;
+      const nm=local.match(/(\d+)\s*[晚蜀上在临院]/); if(nm) nights=parseInt(nm[1],10);
+      const gm=local.match(/(\d+)\s*人/); const guests=gm?parseInt(gm[1],10):null;
+      out.push({ checkin:fmtDate(r.ci), checkout:fmtDate(r.co), nights, amount:bestAmt, channel, guests });
+    }
+    for(let k=1;k<out.length;k++) if(!out[k].channel && out[k-1].channel) out[k].channel=out[k-1].channel;
+    for(let k=out.length-2;k>=0;k--) if(!out[k].channel && out[k+1].channel) out[k].channel=out[k+1].channel;
+    return dedupe(out.filter(o=>o.amount!=null), o=>o.amount, o=>o.checkin, o=>o.checkout);
+  }
+
+  /* 列表页识别结果：每条订单作为一条记录填充进小票，并生成统计汇总 */
+  function importList(text){
+    importOrders(parseOrdersFromList(text), text);
+  }
+
+  function orderAmount(o){ return Number(o.paidAmount)||0; }
+  function orderMonth(o){
+    const c=(o.stay&&o.stay.checkin)||"";
+    let m=c.match(/(\d{1,2})\s*月/); if(m) return parseInt(m[1],10);
+    m=c.match(/(\d{4})[-/.](\d{1,2})/); if(m) return parseInt(m[2],10);
+    return 0;
+  }
+  function fmtMoney(n){ return Number(n||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+  function summaryData(list){
+    const count=list.length;
+    let nights=0, amount=0;
+    const chMap={}, moMap={};
+    list.forEach(o=>{
+      const n=(o.stay&&o.stay.nights)||0; nights+=n;
+      const a=orderAmount(o); amount+=a;
+      const ch=o.channel||"其他";
+      if(!chMap[ch]) chMap[ch]={name:ch,count:0,nights:0,amount:0};
+      chMap[ch].count++; chMap[ch].nights+=n; chMap[ch].amount+=a;
+      const mo=orderMonth(o);
+      if(!moMap[mo]) moMap[mo]={month:mo,count:0,nights:0,amount:0};
+      moMap[mo].count++; moMap[mo].nights+=n; moMap[mo].amount+=a;
+    });
+    const byChannel=Object.values(chMap).sort((x,y)=>y.amount-x.amount);
+    const byMonth=Object.values(moMap).sort((x,y)=>x.month-y.month);
+    return {count,nights,amount,byChannel,byMonth};
+  }
+
+  function buildSummaryBlock(list){
+    const data=summaryData(list);
+    let h='<div class="sum-block"><div class="sum-title">统计汇总（共 '+data.count+' 笔）</div>';
+    h+='<table class="sum-table"><tr><td class="metric">订单数</td><td class="metric-val">'+data.count+' 单</td></tr>'
+      +'<tr><td class="metric">总晚数</td><td class="metric-val">'+data.nights+' 晚</td></tr>'
+      +'<tr><td class="metric">合计金额</td><td class="metric-val amt">¥'+fmtMoney(data.amount)+'</td></tr></table>';
+    h+='<div class="sum-sub">按平台</div><table class="sum-table"><tr><th>平台</th><th>订单数</th><th>总晚数</th><th>金额</th></tr>';
+    data.byChannel.forEach(r=>{ h+='<tr><td>'+esc(r.name)+'</td><td>'+r.count+'</td><td>'+r.nights+'</td><td class="amt">¥'+fmtMoney(r.amount)+'</td></tr>'; });
+    h+='<tr class="sum-total"><td>合计</td><td>'+data.count+'</td><td>'+data.nights+'</td><td class="amt">¥'+fmtMoney(data.amount)+'</td></tr></table>';
+    h+='<div class="sum-sub">按月份</div><table class="sum-table"><tr><th>月份</th><th>订单数</th><th>总晚数</th><th>金额</th></tr>';
+    data.byMonth.forEach(r=>{ h+='<tr><td>'+r.month+'月</td><td>'+r.count+'</td><td>'+r.nights+'</td><td class="amt">¥'+fmtMoney(r.amount)+'</td></tr>'; });
+    h+='<tr class="sum-total"><td>合计</td><td>'+data.count+'</td><td>'+data.nights+'</td><td class="amt">¥'+fmtMoney(data.amount)+'</td></tr></table>';
+    h+='</div>';
+    return h;
+  }
+
+  const SUMMARY_TEMPLATE=`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>民宿订单统计 · 天合民宿</title>
+<style>
+  :root{ --paper:#fbfaf6; --page:#ece8df; --ink:#2c2a27; --ink-2:#6b675e; --muted:#a8a294; --line:#e4dfd4; --accent:#9a8c6d; --radius:14px; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{ font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif; background:radial-gradient(120% 80% at 50% -10%, #f3efe7 0%, #ece8df 60%, #e4dfd4 100%); color:var(--ink); -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1; padding:26px 16px 56px; }
+  .wrap{ width:100%; max-width:520px; margin:0 auto; }
+  .hint{ font-size:11px; letter-spacing:.04em; color:var(--muted); text-align:center; margin-bottom:14px; }
+  .card{ background:var(--paper); border-radius:var(--radius); padding:26px 24px 22px; margin-bottom:18px; box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 18px 40px -24px rgba(60,54,42,.45),0 2px 8px -4px rgba(60,54,42,.18); background-image:radial-gradient(rgba(120,108,86,.035) 1px, transparent 1.4px); background-size:7px 7px, 100% 100%; }
+  .brand{ display:flex; align-items:center; gap:12px; padding-bottom:18px; border-bottom:1px solid var(--line); margin-bottom:18px; }
+  .mark{ width:38px; height:38px; border:1px solid var(--ink-2); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; color:var(--ink); flex:0 0 auto; }
+  .brand-text{ flex:1 1 auto; }
+  .brand-name{ font-size:16px; letter-spacing:.16em; font-weight:600; }
+  .brand-sub{ margin-top:3px; font-size:10px; letter-spacing:.28em; color:var(--muted); }
+  h1{ font-size:15px; font-weight:600; letter-spacing:.12em; color:var(--ink); margin-bottom:14px; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th, td{ padding:12px 10px; text-align:left; border-bottom:1px dashed var(--line); }
+  th{ font-size:10px; letter-spacing:.18em; color:var(--muted); font-weight:600; background:rgba(154,140,109,.05); border-bottom:1px solid var(--line); }
+  td{ color:var(--ink-2); }
+  tr:last-child td{ border-bottom:none; }
+  .metric{ font-size:12px; letter-spacing:.04em; color:var(--muted); }
+  .metric-val{ font-size:15px; font-weight:600; color:var(--ink); }
+  .muted{ color:var(--muted); font-size:12px; }
+  .amt{ font-variant-numeric:tabular-nums; letter-spacing:.02em; }
+  .total-row td{ padding-top:16px; font-size:15px; font-weight:600; color:var(--ink); border-top:1px solid var(--line); border-bottom:none; }
+  .chan-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .note{ margin-top:16px; font-size:11px; color:var(--muted); line-height:1.7; padding:10px 12px; background:rgba(154,140,109,.06); border:1px solid var(--line); border-radius:10px; }
+  .foot{ margin-top:26px; text-align:center; font-size:10px; letter-spacing:.18em; color:var(--muted); line-height:1.8; }
+  .tear{ position:relative; margin:24px -24px 0; height:1px; border-top:1px dashed var(--muted); }
+  .tear .txt{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--paper); padding:0 12px; font-size:10px; letter-spacing:.3em; color:var(--muted); }
+  .tear::before,.tear::after{ content:""; position:absolute; top:50%; width:16px; height:16px; background:var(--page); border-radius:50%; transform:translateY(-50%); }
+  .tear::before{ left:-38px; } .tear::after{ right:-38px; }
+  @media (max-width:430px){ .card{ padding:22px 18px 18px; } .tear{ margin-left:-18px; margin-right:-18px; } th, td{ padding:10px 8px; font-size:12px; } }
+  @media print{ body{ background:#fff; padding:0; } .card{ box-shadow:none; border:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="hint">数据由「上传截图识别」自动生成</p>
+  <div class="card">
+    <h1>订单明细</h1>
+    <table>
+      <tr><th>入住 → 退房</th><th>晚数</th><th>平台</th><th>金额</th></tr>
+      __ORDER_ROWS__
+      <tr class="total-row"><td>合计</td><td>__TOTAL_NIGHTS__ 晚</td><td>__COUNT__ 单</td><td class="amt">¥__TOTAL_AMOUNT__</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <div class="brand"><div class="mark">合</div><div class="brand-text"><div class="brand-name">天合民宿</div><div class="brand-sub">TIANHE HOMESTAY</div></div></div>
+    <h1>订单指标</h1>
+    <table>
+      <tr><td class="metric">订单数</td><td class="metric-val">__COUNT__ 单</td></tr>
+      <tr><td class="metric">总晚数</td><td class="metric-val">__NIGHTS__ 晚</td></tr>
+      <tr><td class="metric">合计金额</td><td class="metric-val amt">¥__AMOUNT__</td></tr>
+    </table>
+    <div class="tear"><span class="txt">沿虚线撕开</span></div>
+  </div>
+  <div class="card">
+    <h1>按平台</h1>
+    <table>
+      <tr><th>平台</th><th>订单数</th><th>总晚数</th><th>合计金额</th></tr>
+      __CHANNEL_ROWS__
+      <tr class="total-row"><td>合计</td><td>__TOTAL_COUNT__ 单</td><td>__TOTAL_NIGHTS__ 晚</td><td class="amt">¥__TOTAL_AMOUNT__</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h1>按月份</h1>
+    <table>
+      <tr><th>月份</th><th>订单数</th><th>总晚数</th><th>合计金额</th></tr>
+      __MONTH_ROWS__
+      <tr class="total-row"><td>合计</td><td>__TOTAL_COUNT__ 单</td><td>__TOTAL_NIGHTS__ 晚</td><td class="amt">¥__TOTAL_AMOUNT__</td></tr>
+    </table>
+  </div>
+  <p class="foot">天合民宿 · 统计凭证<br>数据如有出入，请核对原始订单</p>
+</div>
+</body>
+</html>`;
+
+  function buildSummaryHTML(list){
+    const data=summaryData(list);
+    const chRows=data.byChannel.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+r.count+' 单</td><td>'+r.nights+' 晚</td><td class="amt">¥'+fmtMoney(r.amount)+'</td></tr>').join("");
+    const moRows=data.byMonth.map(r=>'<tr><td>'+r.month+'月</td><td>'+r.count+' 单</td><td>'+r.nights+' 晚</td><td class="amt">¥'+fmtMoney(r.amount)+'</td></tr>').join("");
+    const orderRows=list.map(o=>{
+      const s=o.stay||{};
+      return '<tr><td>'+esc((s.checkin||'')+' → '+(s.checkout||''))+'</td><td>'+esc(s.nights||1)+' 晚</td><td>'+esc(o.channel||'')+'</td><td class="amt">¥'+fmtMoney(Number(o.paidAmount)||0)+'</td></tr>';
+    }).join("");
+    return SUMMARY_TEMPLATE
+      .replace(/__COUNT__/g, data.count)
+      .replace(/__NIGHTS__/g, data.nights)
+      .replace(/__AMOUNT__/g, fmtMoney(data.amount))
+      .replace(/__CHANNEL_ROWS__/g, chRows)
+      .replace(/__MONTH_ROWS__/g, moRows)
+      .replace(/__ORDER_ROWS__/g, orderRows)
+      .replace(/__TOTAL_COUNT__/g, data.count)
+      .replace(/__TOTAL_NIGHTS__/g, data.nights)
+      .replace(/__TOTAL_AMOUNT__/g, fmtMoney(data.amount));
+  }
+
+  function exportSummary(){
+    const html=buildSummaryHTML(orders);
+    const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="order-summary.html";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+
+  /* 把统计页（订单指标/按平台/按月份）栅格化成 PNG 图片导出，离线友好、无跨域资源 */
+  async function exportSummaryImage(){
+    try{
+      if(!orders.length){ setOcr("还没有订单，先上传订单再导出图片","err"); return; }
+      setOcr("正在生成统计图片…");
+      const lib=await loadHtmlToImage();
+      const full=buildSummaryHTML(orders);
+      const sm=full.match(/<style>([\s\S]*?)<\/style>/);
+      const bm=full.match(/<body>([\s\S]*?)<\/body>/);
+      const host=document.createElement("div");
+      host.style.cssText="position:fixed;left:-10000px;top:0;width:540px;";
+      host.innerHTML='<style>'+(sm?sm[1]:"")+'</style>'+(bm?bm[1]:"");
+      document.body.appendChild(host);
+      const node=host.querySelector(".wrap")||host;
+      const dataUrl=await lib.toPng(node,{ pixelRatio:2, backgroundColor:"#ece8df", cacheBust:true });
+      document.body.removeChild(host);
+      const a=document.createElement("a"); a.href=dataUrl; a.download="order-summary.png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setOcr("统计图片已导出 order-summary.png");
+      setTimeout(()=>setOcr(""),4000);
+    }catch(e){ setOcr("导出图片失败："+(e&&e.message||e),"err"); }
+  }
+
+  function orderFromParsed(p){
+    const o=blankOrder();
+    o.channel=p.channel||"美团";
+    o.stay=o.stay||{};
+    o.stay.checkin=p.checkin; o.stay.checkout=p.checkout; o.stay.nights=p.nights; o.stay.checkinWeek=""; o.stay.checkoutWeek="";
+    const amt=p.amount||0;
+    const price=p.nights?+(amt/p.nights).toFixed(2):amt;
+    o.rooms=[{name:"天合民宿",spec:p.guests?("可住"+p.guests+"人"):"可住5人",nights:p.nights,price:price,amount:null}];
+    o.roomTotal=amt; o.cleaning=0; o.deposit=0; o.discounts=[]; o.paidAmount=amt;
+    o.guest=o.guest||{}; if(p.guests) o.guest.guests=p.guests;
+    return o;
+  }
+  function showStatPanel(list, rawText){
+    const panel=document.getElementById("statPanel");
+    const sum=list.reduce((a,b)=>a+(Number(b.paidAmount)||0),0);
+    let html='<div class="stat-head">已导入 <b>'+list.length+'</b> 笔订单到小票 · 合计 <b>¥'+sum.toFixed(2)+'</b></div><div class="stat-list">';
+    list.forEach(o=>{
+      html+='<div class="stat-item"><span class="d">'+(o.stay&&o.stay.checkin||'')+' → '+(o.stay&&o.stay.checkout||'')+' · '+(o.stay&&o.stay.nights||1)+'晚 · '+(o.channel||'')+'</span><span class="amt">¥'+(Number(o.paidAmount)||0).toFixed(2)+'</span></div>';
+    });
+    html+='</div>'+buildSummaryBlock(list)
+      +'<div class="stat-actions"><button class="btn stat-copy" id="statCopy">复制合计 ¥'+sum.toFixed(2)+'</button>'
+      +'<button class="btn stat-export" id="statExport">导出统计页</button>'
+      +'<button class="btn stat-export-img" id="statExportImg">导出图片</button></div>'
+      +'<details class="ocr-raw"><summary>点击展开「识别原文」（若金额/数量仍不对，可复制发我）</summary><pre>'+String(rawText||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")+'</pre></details>';
+    panel.hidden=false; panel.innerHTML=html;
+    const cp=document.getElementById("statCopy");
+    if(cp) cp.addEventListener("click",()=>{
+      if(navigator.clipboard) navigator.clipboard.writeText("合计 ¥"+sum.toFixed(2)+"（共"+list.length+"笔）");
+      cp.textContent="已复制"; setTimeout(()=>cp.textContent="复制合计 ¥"+sum.toFixed(2),1500);
+    });
+    const ex=document.getElementById("statExport");
+    if(ex) ex.addEventListener("click",exportSummary);
+    const exi=document.getElementById("statExportImg");
+    if(exi) exi.addEventListener("click",exportSummaryImage);
+  }
+  function importOrders(parsed, rawText){
+    const panel=document.getElementById("statPanel");
+    lastOcrText=rawText||"";
+    if(!parsed.length){
+      const raw=(rawText||(document.getElementById("ocrText")||{}).textContent||"");
+      const safe=raw.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      const rangeRe=/(\d{1,2})\s*[./\s]?\s*(\d{1,2})\s*[-–~—]\s*(\d{1,2})\s*[./\s]?\s*(\d{1,2})/;
+      const amtRe=/(?:[¥￥Y£€$✱＊*=～≈#“”‘’「」vVx%]\s*|\*)\s*([0-9][0-9,]*\.?\d*)|([0-9][0-9,]*\.\d{1,2})/g;
+      let dateLines=0, amtLines=0;
+      lines.forEach(l=>{ if(rangeRe.test(l)) dateLines++; if(l.match(amtRe)) amtLines++; });
+      panel.hidden=false;
+      panel.innerHTML='<div class="stat-empty">未识别到可导入订单。诊断：识别到 <b>'+dateLines+'</b> 行含日期，<b>'+amtLines+'</b> 行含金额。若日期和金额没配对成功，请把「识别原文」复制发我。</div>'
+        +'<details class="ocr-raw"><summary>点击展开「识别原文」（可复制发我，便于精准修复）</summary><pre>'+safe+'</pre></details>';
+      return;
+    }
+    const beforeAll=orders.length;
+    orders = dedupe(orders.concat(parsed.map(orderFromParsed)), o=>o.paidAmount, o=>o.stay&&o.stay.checkin, o=>o.stay&&o.stay.checkout);
+    sortOrders();
+    const added=orders.length-beforeAll;
+    const dupSkipped=parsed.length-added;
+    current=orders.length-1;
+    showStatPanel(orders, rawText);
+    viewAll=true; renderAll(); save();
+  }
+
+  function blankOrder(){
+    return { store:{name:"天合民宿",sub:"TIANHE HOMESTAY",mark:"合",avatar:AVATAR}, paid:true, channel:"直订",
+      orderNo:"", time:"",
+      stay:{checkin:"",checkout:"",checkinWeek:"",checkoutWeek:"",nights:1},
+      rooms:[{name:"天合民宿",spec:"可住5人",nights:1,price:399.00,amount:null}],
+      roomTotal:0, cleaning:0, deposit:0, discounts:[], paidAmount:0,
+      guest:{name:"xxxx",phone:"",guests:""}, note:"",
+      payment:{method:"",txn:"",time:""} };
+  }
+
+  /* 导出小票（单张或整卷） */
+  function exportHTML(){
+    if(!orders.length){ alert("还没有订单，先上传订单再导出"); return; }
+    const css=document.getElementById("rcss").textContent;
+    let body, title, file;
+    if(viewAll){
+      const idxs=filteredIndices();
+      body=idxs.map(i=>plainReceiptHTML(orders[i])).join('<div class="roll-gap"></div>')+grandTotalHTML(idxs);
+      const suffix=channelFilter==="all"?"合集":channelFilter;
+      title="民宿收据"+suffix; file="minsu-receipts-"+(channelFilter==="all"?"all":channelFilter);
+    } else {
+      body=plainReceiptHTML(orders[current]);
+      title="民宿收据 "+orders[current].orderNo; file="minsu-receipt-"+(orders[current].orderNo||"order");
+    }
+    const doc=`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">`
+      +`<meta name="viewport" content="width=device-width,initial-scale=1">`
+      +`<title>${esc(title)}</title>`
+      +`<style>${css}\nbody{background:radial-gradient(120% 80% at 50% -10%,#f3efe7,#ece8df 60%,#e4dfd4);`
+      +`min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 16px;`
+      +`font-family:${FONT};}</style></head><body>${body}`
+      +`<p class="foot">本收据仅作预订凭证，请妥善保管</p></body></html>`;
+    const blob=new Blob([doc],{type:"text/html"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`${file}.html`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  }
+
+  /* 导出到腾讯文档：生成表格 → 复制 + 打开腾讯文档在线表格（粘贴即用）+ 下载 CSV 备用 */
+  function ordersToRows(){
+    const cols=["渠道","订单号","入住日期","退房日期","间夜","房费","清洁费","押金(可退)","实付金额","客人","电话"];
+    const rows=[cols];
+    let sRoom=0,sClean=0,sDep=0,sPaid=0;
+    const num=v=>{ const n=Number(v); return (v==null||isNaN(n))?0:n; };
+    const cell=v=>String(v==null?"":v).replace(/\t/g," ").replace(/[\r\n]/g," ");
+    orders.forEach(o=>{
+      const s=o.stay||{};
+      rows.push([
+        chanOf(o), o.orderNo||"", s.checkin||"", s.checkout||"",
+        s.nights!=null?s.nights:"",
+        num(o.roomTotal).toFixed(2), num(o.cleaning).toFixed(2),
+        num(o.deposit).toFixed(2), num(o.paidAmount).toFixed(2),
+        o.guestName||"", o.guestPhone||""
+      ].map(cell));
+      sRoom+=num(o.roomTotal); sClean+=num(o.cleaning); sDep+=num(o.deposit); sPaid+=num(o.paidAmount);
+    });
+    rows.push(["合计","","","","", sRoom.toFixed(2), sClean.toFixed(2), sDep.toFixed(2), sPaid.toFixed(2), "",""].map(cell));
+    return rows;
+  }
+  function rowsToTSV(rows){ return rows.map(r=>r.join("\t")).join("\n"); }
+  function fallbackCopy(text){
+    try{ const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select(); document.execCommand&&document.execCommand("copy"); ta.remove(); }catch(_){}
+  }
+  function setExpStatus(msg,err){ const el=document.getElementById("expStatus"); if(el){ el.textContent=msg||""; el.className="exp-status"+(err?" err":""); } }
+  function exportToTencentDocs(){
+    if(!orders.length){ setExpStatus("还没有订单，先上传订单再导出", true); return; }
+    const rows=ordersToRows();
+    const tsv=rowsToTSV(rows);
+    const csv="\uFEFF"+rows.map(r=>r.map(c=>/[,|\n|"]/.test(c)?"\""+c.replace(/"/g,'""')+"\"":c).join(",")).join("\n");
+    const done=()=>{ setExpStatus("已复制 "+orders.length+" 笔订单 → 已打开腾讯文档，按 Ctrl+V 粘贴成表；也可把下载的 CSV 在腾讯文档「导入」", false); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(tsv).then(done).catch(()=>{ fallbackCopy(tsv); done(); }); }
+    else { fallbackCopy(tsv); done(); }
+    try{ window.open("https://docs.qq.com/sheet/","_blank","noopener"); }catch(_){}
+    try{
+      const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+      a.download="天合民宿订单.csv"; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    }catch(_){}
+  }
+
+  renderAll();
+  /* 启动：若开启维格表自动同步，把本地数据镜像到云端（本地先渲染，再覆盖同步） */
+  if(VIKA && VIKA.auto && vikaEnabled()){ doVikaPush().catch(()=>{}); }
+</script>
+</body>
+</html>
